@@ -45,6 +45,7 @@ func main() {
 
 	creds := credentials.NewCredentials(&credentials.EC2RoleProvider{})
 	// Hardcode region to us-east-1 for now. Perhaps fetch through metadata service
+	// curl http://169.254.169.254/latest/meta-data/placement/availability-zone
 	awsConfig := aws.Config{
 		Credentials: creds,
 		Region: "us-east-1",
@@ -157,7 +158,7 @@ func main() {
 			}
 			_, err = r53Api.ChangeResourceRecordSets(&crrsInput)
 			if err != nil {
-				glog.Warningf("Failed to update record set")
+				glog.Warningf("Failed to update record set: %v", err)
 				break
 			}
 		}
