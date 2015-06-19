@@ -12,4 +12,4 @@ ADD . $APP_DIR
 # Compile the binary and statically link
 RUN mkdir /opt/app
 RUN cd $APP_DIR && godep restore
-RUN cd $APP_DIR && go build -o /opt/app/route53-kubernetes -ldflags '-d -w -s'
+RUN cd $APP_DIR && go build -o /opt/app/route53-kubernetes
