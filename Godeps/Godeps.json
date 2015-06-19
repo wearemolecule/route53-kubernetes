@@ -113,6 +113,11 @@
 			"Rev": "912c4af1b7e1dd2f8735668df44b2750c552c07b"
 		},
 		{
+			"ImportPath": "github.com/aws/aws-sdk-go/service/elb",
+			"Comment": "v0.6.3",
+			"Rev": "912c4af1b7e1dd2f8735668df44b2750c552c07b"
+		},
+		{
 			"ImportPath": "github.com/aws/aws-sdk-go/service/route53",
 			"Comment": "v0.6.3",
 			"Rev": "912c4af1b7e1dd2f8735668df44b2750c552c07b"
