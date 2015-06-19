@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 	"io/ioutil"
 
@@ -11,6 +12,9 @@ import (
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/golang/glog"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/service/route53"
 )
 
 func main() {
@@ -37,6 +41,12 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
+
+	creds := credentials.NewCredentials(&credentials.EC2RoleProvider{})
+	awsConfig := aws.Config{
+		Credentials: creds,
+	}
+	r53Api := route53.New(&awsConfig)
 
 	selector := "dns=route53"
 	l, err := labels.Parse(selector)
@@ -72,6 +82,30 @@ func main() {
 			}
 
 			glog.Infof("%d: %s Service: %s -> %s", i, s.Name, hn, domain)
+			domainParts := strings.Split(domain, ".")
+			segments := len(domainParts)
+			tld := strings.Join(domainParts[segments-2:], ".")
+			subdomain := strings.Join(domainParts[:segments-2], ".")
+
+			listHostedZoneInput := route53.ListHostedZonesByNameInput{
+				DNSName: &tld,
+			}
+			hzOut, err := r53Api.ListHostedZonesByName(&listHostedZoneInput)
+			if err != nil {
+				glog.Warningf("No zone found for %s: %v", tld, err)
+				break
+			}
+			zones := hzOut.HostedZones
+			if len(zones) < 1 {
+				glog.Warningf("No zone found for %s: %v", tld, err)
+				break
+			}
+			if len(zones) > 1 {
+				glog.Warningf("Multiple zones found for %s: %v", tld, err)
+				break
+			}
+			zoneId := zones[0].ID
+			glog.Infof("Found these things: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, *zoneId)
 		}
 		time.Sleep(30 * time.Second)
 	}
