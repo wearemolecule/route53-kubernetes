@@ -15,7 +15,7 @@ import (
 
 func main() {
 	flag.Parse()
-	glog.Info("Elasticsearch discovery")
+	glog.Info("Route53 Update Service")
 	kubernetesService := os.Getenv("KUBERNETES_SERVICE_HOST")
 	if kubernetesService == "" {
 		glog.Fatalf("Please specify the Kubernetes server with --server")
