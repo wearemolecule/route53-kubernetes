@@ -65,7 +65,7 @@ func main() {
 			}
 			hn := ingress[0].Hostname
 
-			domain, ok := s.ObjectMeta.Annotations["domain-name"]
+			domain, ok := s.ObjectMeta.Annotations["domainName"]
 			if !ok {
 				glog.Warningf("Domain name not set for %s", s.Name)
 				break
