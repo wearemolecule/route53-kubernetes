@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go/service/elb"
 )
 
 func main() {
@@ -47,6 +48,7 @@ func main() {
 		Credentials: creds,
 	}
 	r53Api := route53.New(&awsConfig)
+	elbApi := elb.New(&awsConfig)
 
 	selector := "dns=route53"
 	l, err := labels.Parse(selector)
@@ -87,6 +89,28 @@ func main() {
 			tld := strings.Join(domainParts[segments-2:], ".")
 			subdomain := strings.Join(domainParts[:segments-2], ".")
 
+			elbName := strings.Split(hn, "-")[0]
+			lbInput := &elb.DescribeLoadBalancersInput{
+				LoadBalancerNames: []*string{
+					&elbName,
+				},
+			}
+			resp, err := elbApi.DescribeLoadBalancers(lbInput)
+			if err != nil {
+				glog.Warningf("Could not describe load balancer: %v", err)
+				break
+			}
+			descs := resp.LoadBalancerDescriptions
+			if len(descs) < 1 {
+				glog.Warningf("No lb found for %s: %v", tld, err)
+				break
+			}
+			if len(descs) > 1 {
+				glog.Warningf("Multiple lbs found for %s: %v", tld, err)
+				break
+			}
+			hzId := descs[0].CanonicalHostedZoneNameID
+
 			listHostedZoneInput := route53.ListHostedZonesByNameInput{
 				DNSName: &tld,
 			}
@@ -106,6 +130,34 @@ func main() {
 			}
 			zoneId := zones[0].ID
 			glog.Infof("Found these things: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, *zoneId)
+
+			var ttl int64 = 3600
+			at := route53.AliasTarget{
+				DNSName: &hn,
+				HostedZoneID: hzId,
+			}
+			rrs := route53.ResourceRecordSet{
+				AliasTarget: &at,
+				Name: &subdomain,
+				TTL: &ttl,
+			}
+			change := route53.Change{
+				Action: aws.String("UPSERT"),
+				ResourceRecordSet: &rrs,
+			}
+			batch := route53.ChangeBatch{
+				Changes: []*route53.Change{&change},
+				Comment: aws.String("Kubernetes Update to Service"),
+			}
+			crrsInput := route53.ChangeResourceRecordSetsInput{
+				ChangeBatch: &batch,
+				HostedZoneID: zoneId,
+			}
+			_, err = r53Api.ChangeResourceRecordSets(&crrsInput)
+			if err != nil {
+				glog.Warningf("Failed to update record set")
+				break
+			}
 		}
 		time.Sleep(30 * time.Second)
 	}
