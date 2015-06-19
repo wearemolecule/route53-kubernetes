@@ -44,8 +44,10 @@ func main() {
 	}
 
 	creds := credentials.NewCredentials(&credentials.EC2RoleProvider{})
+	// Hardcode region to us-east-1 for now. Perhaps fetch through metadata service
 	awsConfig := aws.Config{
 		Credentials: creds,
+		Region: "us-east-1",
 	}
 	r53Api := route53.New(&awsConfig)
 	elbApi := elb.New(&awsConfig)
