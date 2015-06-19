@@ -81,8 +81,8 @@ func NewSSHTunnel(user, keyfile, host string) (*SSHTunnel, error) {
 	return makeSSHTunnel(user, signer, host)
 }
 
-func NewSSHTunnelFromBytes(user string, buffer []byte, host string) (*SSHTunnel, error) {
-	signer, err := MakePrivateKeySignerFromBytes(buffer)
+func NewSSHTunnelFromBytes(user string, privateKey []byte, host string) (*SSHTunnel, error) {
+	signer, err := MakePrivateKeySignerFromBytes(privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +142,8 @@ func (s *SSHTunnel) Close() error {
 	return nil
 }
 
+// RunSSHCommand returns the stdout, stderr, and exit code from running cmd on
+// host along with any SSH-level error.
 func RunSSHCommand(cmd, host string, signer ssh.Signer) (string, string, int, error) {
 	// Setup the config, dial the server, and open a session.
 	config := &ssh.ClientConfig{
@@ -182,12 +184,7 @@ func RunSSHCommand(cmd, host string, signer ssh.Signer) (string, string, int, er
 
 func MakePrivateKeySignerFromFile(key string) (ssh.Signer, error) {
 	// Create an actual signer.
-	file, err := os.Open(key)
-	if err != nil {
-		return nil, fmt.Errorf("error opening SSH key %s: '%v'", key, err)
-	}
-	defer file.Close()
-	buffer, err := ioutil.ReadAll(file)
+	buffer, err := ioutil.ReadFile(key)
 	if err != nil {
 		return nil, fmt.Errorf("error reading SSH key %s: '%v'", key, err)
 	}
@@ -202,26 +199,46 @@ func MakePrivateKeySignerFromBytes(buffer []byte) (ssh.Signer, error) {
 	return signer, nil
 }
 
+func ParsePublicKeyFromFile(keyFile string) (*rsa.PublicKey, error) {
+	buffer, err := ioutil.ReadFile(keyFile)
+	if err != nil {
+		return nil, fmt.Errorf("error reading SSH key %s: '%v'", keyFile, err)
+	}
+	keyBlock, _ := pem.Decode(buffer)
+	key, err := x509.ParsePKIXPublicKey(keyBlock.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing SSH key %s: '%v'", keyFile, err)
+	}
+	rsaKey, ok := key.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("SSH key could not be parsed as rsa public key")
+	}
+	return rsaKey, nil
+}
+
+// Should be thread safe.
 type SSHTunnelEntry struct {
 	Address string
 	Tunnel  *SSHTunnel
 }
 
+// Not thread safe!
 type SSHTunnelList struct {
 	entries []SSHTunnelEntry
 }
 
-func MakeSSHTunnels(user, keyfile string, addresses []string) (*SSHTunnelList, error) {
+func MakeSSHTunnels(user, keyfile string, addresses []string) *SSHTunnelList {
 	tunnels := []SSHTunnelEntry{}
 	for ix := range addresses {
 		addr := addresses[ix]
 		tunnel, err := NewSSHTunnel(user, keyfile, addr)
 		if err != nil {
-			return nil, err
+			glog.Errorf("Failed to create tunnel for %q: %v", addr, err)
+			continue
 		}
 		tunnels = append(tunnels, SSHTunnelEntry{addr, tunnel})
 	}
-	return &SSHTunnelList{tunnels}, nil
+	return &SSHTunnelList{tunnels}
 }
 
 // Open attempts to open all tunnels in the list, and removes any tunnels that
@@ -258,11 +275,23 @@ func (l *SSHTunnelList) Close() {
 	}
 }
 
+/* this will make sense if we move the lock into SSHTunnelList.
 func (l *SSHTunnelList) Dial(network, addr string) (net.Conn, error) {
 	if len(l.entries) == 0 {
-		return nil, fmt.Errorf("Empty tunnel list.")
+		return nil, fmt.Errorf("empty tunnel list.")
 	}
-	return l.entries[mathrand.Int()%len(l.entries)].Tunnel.Dial(network, addr)
+	n := mathrand.Intn(len(l.entries))
+	return l.entries[n].Tunnel.Dial(network, addr)
+}
+*/
+
+// Returns a random tunnel, xor an error if there are none.
+func (l *SSHTunnelList) PickRandomTunnel() (SSHTunnelEntry, error) {
+	if len(l.entries) == 0 {
+		return SSHTunnelEntry{}, fmt.Errorf("empty tunnel list.")
+	}
+	n := mathrand.Intn(len(l.entries))
+	return l.entries[n], nil
 }
 
 func (l *SSHTunnelList) Has(addr string) bool {
@@ -290,7 +319,6 @@ func EncodePublicKey(public *rsa.PublicKey) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return pem.EncodeToMemory(&pem.Block{
 		Bytes: publicBytes,
 		Type:  "PUBLIC KEY",

@@ -14,68 +14,68 @@
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/api",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/auth/user",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/client",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/conversion",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/fields",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/labels",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/probe",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/runtime",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/types",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/util",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/version",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/pkg/watch",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/GoogleCloudPlatform/kubernetes/third_party/forked/reflect",
-			"Comment": "v0.19.0-485-g94fac83",
-			"Rev": "94fac8384cd96c861aae837630ebac5e89397fd8"
+			"Comment": "v0.19.1-677-gf02c685",
+			"Rev": "f02c685532aa0af84fbf13bcda95bb249c69cd47"
 		},
 		{
 			"ImportPath": "github.com/beorn7/perks/quantile",
