@@ -1,4 +1,4 @@
-FROM google/golang:stable
+FROM golang:1.4
 
 # Godep for vendoring
 RUN go get github.com/tools/godep
