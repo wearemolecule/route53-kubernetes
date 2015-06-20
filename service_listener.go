@@ -137,11 +137,13 @@ func main() {
 			var ttl int64 = 3600
 			at := route53.AliasTarget{
 				DNSName: &hn,
+				EvaluateTargetHealth: aws.Boolean(false),
 				HostedZoneID: hzId,
 			}
 			rrs := route53.ResourceRecordSet{
 				AliasTarget: &at,
 				Name: &subdomain,
+				Type: aws.String("A"),
 				TTL: &ttl,
 			}
 			change := route53.Change{
