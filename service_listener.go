@@ -86,7 +86,7 @@ func main() {
 				break
 			}
 
-			glog.Infof("%d: %s Service: %s -> %s", i, s.Name, hn, domain)
+			glog.Infof("Creating DNS for %s service: %s -> %s", i, s.Name, hn, domain)
 			domainParts := strings.Split(domain, ".")
 			segments := len(domainParts)
 			tld := strings.Join(domainParts[segments-2:], ".")
@@ -134,7 +134,6 @@ func main() {
 			zoneId := *zones[0].ID
 			zoneParts := strings.Split(zoneId, "/")
 			zoneId = zoneParts[len(zoneParts)-1]
-			glog.Infof("Found these things: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, zoneId)
 
 			at := route53.AliasTarget{
 				DNSName: &hn,
@@ -163,6 +162,7 @@ func main() {
 				glog.Warningf("Failed to update record set: %v", err)
 				break
 			}
+			glog.Infof("Created dns record set: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, zoneId)
 		}
 		time.Sleep(30 * time.Second)
 	}
