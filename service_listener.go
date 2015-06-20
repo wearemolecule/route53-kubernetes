@@ -131,8 +131,10 @@ func main() {
 				glog.Warningf("Multiple zones found for %s: %v", tld, err)
 				break
 			}
-			zoneId := zones[0].ID
-			glog.Infof("Found these things: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, *zoneId)
+			zoneId := *zones[0].ID
+			zoneParts := strings.Split(zoneId, "/")
+			zoneId = zoneParts[len(zoneParts)-1]
+			glog.Infof("Found these things: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, zoneId)
 
 			var ttl int64 = 3600
 			at := route53.AliasTarget{
@@ -156,7 +158,7 @@ func main() {
 			}
 			crrsInput := route53.ChangeResourceRecordSetsInput{
 				ChangeBatch: &batch,
-				HostedZoneID: zoneId,
+				HostedZoneID: &zoneId,
 			}
 			_, err = r53Api.ChangeResourceRecordSets(&crrsInput)
 			if err != nil {
