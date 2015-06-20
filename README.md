@@ -33,7 +33,9 @@ spec:
   type: LoadBalancer
 ```
 
-This service will create an "A" record as an alias to the ELB that is configured by kubernetes.
+An "A" record for `test.mydomain.com` will be created as an alias to the ELB that is
+configured by kubernetes. This assumes that a hosted zone exists in Route53 for mydomain.com.
+Any record that previously existed for that dns record will be updated.
 
 This service expects that it's running on a Kubernetes node on AWS and that the IAM profile for
 that node is set up to allow the following, along with the default permissions needed by Kubernetes:
