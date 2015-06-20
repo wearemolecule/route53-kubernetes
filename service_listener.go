@@ -136,7 +136,6 @@ func main() {
 			zoneId = zoneParts[len(zoneParts)-1]
 			glog.Infof("Found these things: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, zoneId)
 
-			var ttl int64 = 3600
 			at := route53.AliasTarget{
 				DNSName: &hn,
 				EvaluateTargetHealth: aws.Boolean(false),
@@ -144,9 +143,8 @@ func main() {
 			}
 			rrs := route53.ResourceRecordSet{
 				AliasTarget: &at,
-				Name: &subdomain,
+				Name: &domain,
 				Type: aws.String("A"),
-				TTL: &ttl,
 			}
 			change := route53.Change{
 				Action: aws.String("UPSERT"),
