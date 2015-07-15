@@ -128,7 +128,7 @@ func main() {
 				break
 			}
 			// The AWS API may return more than one zone, the first zone should be the relevant one
-			tldWithDot = fmt.Sprint(tld, ".")
+			tldWithDot := fmt.Sprint(tld, ".")
 			if *zones[0].Name != tldWithDot {
 				glog.Warningf("Zone found %s does not match tld given %s", *zones[0].Name, tld)
 				break
