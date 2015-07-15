@@ -72,18 +72,18 @@ func main() {
 			ingress := s.Status.LoadBalancer.Ingress
 			if len(ingress) < 1 {
 				glog.Warningf("No ingress defined for ELB")
-				break
+				continue
 			}
 			if len(ingress) < 1 {
 				glog.Warningf("Multiple ingress points found for ELB, not supported")
-				break
+				continue
 			}
 			hn := ingress[0].Hostname
 
 			domain, ok := s.ObjectMeta.Annotations["domainName"]
 			if !ok {
 				glog.Warningf("Domain name not set for %s", s.Name)
-				break
+				continue
 			}
 
 			glog.Infof("Creating DNS for %s service: %s -> %s", i, s.Name, hn, domain)
@@ -101,16 +101,16 @@ func main() {
 			resp, err := elbApi.DescribeLoadBalancers(lbInput)
 			if err != nil {
 				glog.Warningf("Could not describe load balancer: %v", err)
-				break
+				continue
 			}
 			descs := resp.LoadBalancerDescriptions
 			if len(descs) < 1 {
 				glog.Warningf("No lb found for %s: %v", tld, err)
-				break
+				continue
 			}
 			if len(descs) > 1 {
 				glog.Warningf("Multiple lbs found for %s: %v", tld, err)
-				break
+				continue
 			}
 			hzId := descs[0].CanonicalHostedZoneNameID
 
@@ -120,18 +120,18 @@ func main() {
 			hzOut, err := r53Api.ListHostedZonesByName(&listHostedZoneInput)
 			if err != nil {
 				glog.Warningf("No zone found for %s: %v", tld, err)
-				break
+				continue
 			}
 			zones := hzOut.HostedZones
 			if len(zones) < 1 {
 				glog.Warningf("No zone found for %s", tld)
-				break
+				continue
 			}
 			// The AWS API may return more than one zone, the first zone should be the relevant one
 			tldWithDot := fmt.Sprint(tld, ".")
 			if *zones[0].Name != tldWithDot {
 				glog.Warningf("Zone found %s does not match tld given %s", *zones[0].Name, tld)
-				break
+				continue
 			}
 			zoneId := *zones[0].ID
 			zoneParts := strings.Split(zoneId, "/")
@@ -162,7 +162,7 @@ func main() {
 			_, err = r53Api.ChangeResourceRecordSets(&crrsInput)
 			if err != nil {
 				glog.Warningf("Failed to update record set: %v", err)
-				break
+				continue
 			}
 			glog.Infof("Created dns record set: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, zoneId)
 		}
