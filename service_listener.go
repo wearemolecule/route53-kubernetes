@@ -124,11 +124,13 @@ func main() {
 			}
 			zones := hzOut.HostedZones
 			if len(zones) < 1 {
-				glog.Warningf("No zone found for %s: %v", tld, err)
+				glog.Warningf("No zone found for %s", tld)
 				break
 			}
-			if len(zones) > 1 {
-				glog.Warningf("Multiple zones found for %s: %v", tld, err)
+			// The AWS API may return more than one zone, the first zone should be the relevant one
+			tldWithDot = fmt.Sprint(tld, ".")
+			if *zones[0].Name != tldWithDot {
+				glog.Warningf("Zone found %s does not match tld given %s", *zones[0].Name, tld)
 				break
 			}
 			zoneId := *zones[0].ID
