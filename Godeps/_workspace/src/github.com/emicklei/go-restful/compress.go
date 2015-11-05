@@ -20,6 +20,7 @@ var EnableContentEncoding = false
 type CompressingResponseWriter struct {
 	writer     http.ResponseWriter
 	compressor io.WriteCloser
+	encoding   string
 }
 
 // Header is part of http.ResponseWriter interface
@@ -46,6 +47,14 @@ func (c *CompressingResponseWriter) CloseNotify() <-chan bool {
 // Close the underlying compressor
 func (c *CompressingResponseWriter) Close() {
 	c.compressor.Close()
+	if ENCODING_GZIP == c.encoding {
+		currentCompressorProvider.ReleaseGzipWriter(c.compressor.(*gzip.Writer))
+	}
+	if ENCODING_DEFLATE == c.encoding {
+		currentCompressorProvider.ReleaseZlibWriter(c.compressor.(*zlib.Writer))
+	}
+	// gc hint needed?
+	c.compressor = nil
 }
 
 // WantsCompressedResponse reads the Accept-Encoding header to see if and which encoding is requested.
@@ -73,15 +82,15 @@ func NewCompressingResponseWriter(httpWriter http.ResponseWriter, encoding strin
 	c.writer = httpWriter
 	var err error
 	if ENCODING_GZIP == encoding {
-		c.compressor, err = gzip.NewWriterLevel(httpWriter, gzip.BestSpeed)
-		if err != nil {
-			return nil, err
-		}
+		w := currentCompressorProvider.AcquireGzipWriter()
+		w.Reset(httpWriter)
+		c.compressor = w
+		c.encoding = ENCODING_GZIP
 	} else if ENCODING_DEFLATE == encoding {
-		c.compressor, err = zlib.NewWriterLevel(httpWriter, zlib.BestSpeed)
-		if err != nil {
-			return nil, err
-		}
+		w := currentCompressorProvider.AcquireZlibWriter()
+		w.Reset(httpWriter)
+		c.compressor = w
+		c.encoding = ENCODING_DEFLATE
 	} else {
 		return nil, errors.New("Unknown encoding:" + encoding)
 	}

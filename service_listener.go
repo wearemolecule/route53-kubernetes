@@ -13,9 +13,9 @@ import (
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/glog"
-	"github.com/kubernetes/kubernetes/pkg/api"
-	client "github.com/kubernetes/kubernetes/pkg/client/unversioned"
-	"github.com/kubernetes/kubernetes/pkg/labels"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func main() {
