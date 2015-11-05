@@ -3,19 +3,19 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"time"
-	"io/ioutil"
 
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
 	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/golang/glog"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/golang/glog"
 )
 
 func main() {
@@ -43,12 +43,17 @@ func main() {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
 
-	creds := credentials.NewCredentials(&credentials.EC2RoleProvider{})
+	creds := credentials.NewChainCredentials(
+		[]credentials.Provider{
+			&credentials.SharedCredentialsProvider{},
+			&credentials.EnvProvider{},
+			&credentials.EC2RoleProvider{},
+		})
 	// Hardcode region to us-east-1 for now. Perhaps fetch through metadata service
 	// curl http://169.254.169.254/latest/meta-data/placement/availability-zone
 	awsConfig := aws.Config{
 		Credentials: creds,
-		Region: "us-east-1",
+		Region:      "us-east-1",
 	}
 	r53Api := route53.New(&awsConfig)
 	elbApi := elb.New(&awsConfig)
@@ -138,17 +143,17 @@ func main() {
 			zoneId = zoneParts[len(zoneParts)-1]
 
 			at := route53.AliasTarget{
-				DNSName: &hn,
+				DNSName:              &hn,
 				EvaluateTargetHealth: aws.Boolean(false),
-				HostedZoneID: hzId,
+				HostedZoneID:         hzId,
 			}
 			rrs := route53.ResourceRecordSet{
 				AliasTarget: &at,
-				Name: &domain,
-				Type: aws.String("A"),
+				Name:        &domain,
+				Type:        aws.String("A"),
 			}
 			change := route53.Change{
-				Action: aws.String("UPSERT"),
+				Action:            aws.String("UPSERT"),
 				ResourceRecordSet: &rrs,
 			}
 			batch := route53.ChangeBatch{
@@ -156,7 +161,7 @@ func main() {
 				Comment: aws.String("Kubernetes Update to Service"),
 			}
 			crrsInput := route53.ChangeResourceRecordSetsInput{
-				ChangeBatch: &batch,
+				ChangeBatch:  &batch,
 				HostedZoneID: &zoneId,
 			}
 			_, err = r53Api.ChangeResourceRecordSets(&crrsInput)
