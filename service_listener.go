@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/glog"
+	"github.com/kubernetes/kubernetes/pkg/api"
+	client "github.com/kubernetes/kubernetes/pkg/client/unversioned"
+	"github.com/kubernetes/kubernetes/pkg/labels"
 )
 
 func main() {
