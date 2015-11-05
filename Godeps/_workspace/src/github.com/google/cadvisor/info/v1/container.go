@@ -58,6 +58,12 @@ type ContainerSpec struct {
 
 	// HasDiskIo when true, indicates that DiskIo stats will be available.
 	HasDiskIo bool `json:"has_diskio"`
+
+	HasCustomMetrics bool         `json:"has_custom_metrics"`
+	CustomMetrics    []MetricSpec `json:"custom_metrics,omitempty"`
+
+	// Image name used for this container.
+	Image string `json:"image,omitempty"`
 }
 
 // Container reference contains enough information to uniquely identify a container
@@ -190,6 +196,9 @@ func (self *ContainerSpec) Eq(b *ContainerSpec) bool {
 	if self.HasDiskIo != b.HasDiskIo {
 		return false
 	}
+	if self.HasCustomMetrics != b.HasCustomMetrics {
+		return false
+	}
 	return true
 }
 
@@ -303,6 +312,8 @@ type MemoryStats struct {
 	// Units: Bytes.
 	WorkingSet uint64 `json:"working_set"`
 
+	Failcnt uint64 `json:"failcnt"`
+
 	ContainerData    MemoryStatsMemoryData `json:"container_data,omitempty"`
 	HierarchicalData MemoryStatsMemoryData `json:"hierarchical_data,omitempty"`
 }
@@ -312,7 +323,9 @@ type MemoryStatsMemoryData struct {
 	Pgmajfault uint64 `json:"pgmajfault"`
 }
 
-type NetworkStats struct {
+type InterfaceStats struct {
+	// The name of the interface.
+	Name string `json:"name"`
 	// Cumulative count of bytes received.
 	RxBytes uint64 `json:"rx_bytes"`
 	// Cumulative count of packets received.
@@ -329,6 +342,40 @@ type NetworkStats struct {
 	TxErrors uint64 `json:"tx_errors"`
 	// Cumulative count of packets dropped while transmitting.
 	TxDropped uint64 `json:"tx_dropped"`
+}
+
+type NetworkStats struct {
+	InterfaceStats `json:",inline"`
+	Interfaces     []InterfaceStats `json:"interfaces,omitempty"`
+	// TCP connection stats (Established, Listen...)
+	Tcp TcpStat `json:"tcp"`
+	// TCP6 connection stats (Established, Listen...)
+	Tcp6 TcpStat `json:"tcp6"`
+}
+
+type TcpStat struct {
+	//Count of TCP connections in state "Established"
+	Established uint64
+	//Count of TCP connections in state "Syn_Sent"
+	SynSent uint64
+	//Count of TCP connections in state "Syn_Recv"
+	SynRecv uint64
+	//Count of TCP connections in state "Fin_Wait1"
+	FinWait1 uint64
+	//Count of TCP connections in state "Fin_Wait2"
+	FinWait2 uint64
+	//Count of TCP connections in state "Time_Wait
+	TimeWait uint64
+	//Count of TCP connections in state "Close"
+	Close uint64
+	//Count of TCP connections in state "Close_Wait"
+	CloseWait uint64
+	//Count of TCP connections in state "Listen_Ack"
+	LastAck uint64
+	//Count of TCP connections in state "Listen"
+	Listen uint64
+	//Count of TCP connections in state "Closing"
+	Closing uint64
 }
 
 type FsStats struct {
@@ -412,6 +459,9 @@ type ContainerStats struct {
 
 	// Task load stats
 	TaskStats LoadStats `json:"task_stats,omitempty"`
+
+	//Custom metrics from all collectors
+	CustomMetrics map[string][]MetricVal `json:"custom_metrics,omitempty"`
 }
 
 func timeEq(t1, t2 time.Time, tolerance time.Duration) bool {
