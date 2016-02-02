@@ -78,7 +78,7 @@ func main() {
 	r53Api := route53.New(sess)
 	elbApi := elb.New(sess)
 	if r53Api == nil || elbApi == nil {
-		glog.Fatalf("Failed to make AWS connection")
+		glog.Fatal("Failed to make AWS connection")
 	}
 
 	selector := "dns=route53"
