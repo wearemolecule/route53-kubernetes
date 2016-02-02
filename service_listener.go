@@ -3,19 +3,21 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"strings"
 	"time"
-	"io/ioutil"
 
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/api"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/client"
-	"github.com/GoogleCloudPlatform/kubernetes/pkg/labels"
-	"github.com/golang/glog"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elb"
+	"github.com/aws/aws-sdk-go/service/route53"
+	"github.com/golang/glog"
+	"k8s.io/kubernetes/pkg/api"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/labels"
 )
 
 func main() {
@@ -43,25 +45,29 @@ func main() {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
 
-	creds := credentials.NewCredentials(&credentials.EC2RoleProvider{})
+	creds := credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{})
 	// Hardcode region to us-east-1 for now. Perhaps fetch through metadata service
 	// curl http://169.254.169.254/latest/meta-data/placement/availability-zone
-	awsConfig := aws.Config{
-		Credentials: creds,
-		Region: "us-east-1",
-	}
-	r53Api := route53.New(&awsConfig)
-	elbApi := elb.New(&awsConfig)
+	awsConfig := aws.NewConfig()
+	awsConfig.WithCredentials(creds)
+	awsConfig.WithRegion("us-east-1")
+	sess := session.New(awsConfig)
+
+	r53Api := route53.New(sess)
+	elbApi := elb.New(sess)
 
 	selector := "dns=route53"
 	l, err := labels.Parse(selector)
 	if err != nil {
 		glog.Fatalf("Failed to parse selector %q: %v", selector, err)
 	}
+	listOptions := api.ListOptions{
+		LabelSelector: l,
+	}
 
 	glog.Infof("Starting Service Polling every 30s")
 	for {
-		services, err := c.Services(api.NamespaceAll).List(l)
+		services, err := c.Services(api.NamespaceAll).List(listOptions)
 		if err != nil {
 			glog.Fatalf("Failed to list pods: %v", err)
 		}
@@ -133,22 +139,22 @@ func main() {
 				glog.Warningf("Zone found %s does not match tld given %s", *zones[0].Name, tld)
 				continue
 			}
-			zoneId := *zones[0].ID
+			zoneId := *zones[0].Id
 			zoneParts := strings.Split(zoneId, "/")
 			zoneId = zoneParts[len(zoneParts)-1]
 
 			at := route53.AliasTarget{
-				DNSName: &hn,
-				EvaluateTargetHealth: aws.Boolean(false),
-				HostedZoneID: hzId,
+				DNSName:              &hn,
+				EvaluateTargetHealth: aws.Bool(false),
+				HostedZoneId:         hzId,
 			}
 			rrs := route53.ResourceRecordSet{
 				AliasTarget: &at,
-				Name: &domain,
-				Type: aws.String("A"),
+				Name:        &domain,
+				Type:        aws.String("A"),
 			}
 			change := route53.Change{
-				Action: aws.String("UPSERT"),
+				Action:            aws.String("UPSERT"),
 				ResourceRecordSet: &rrs,
 			}
 			batch := route53.ChangeBatch{
@@ -156,8 +162,8 @@ func main() {
 				Comment: aws.String("Kubernetes Update to Service"),
 			}
 			crrsInput := route53.ChangeResourceRecordSetsInput{
-				ChangeBatch: &batch,
-				HostedZoneID: &zoneId,
+				ChangeBatch:  &batch,
+				HostedZoneId: &zoneId,
 			}
 			_, err = r53Api.ChangeResourceRecordSets(&crrsInput)
 			if err != nil {

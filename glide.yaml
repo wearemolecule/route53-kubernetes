@@ -1,0 +1,6 @@
+package: ""
+import:
+- package: k8s.io/kubernetes
+  version: v1.2.0-alpha.7
+- package: github.com/aws/aws-sdk-go
+  version: v1.1.0

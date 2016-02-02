@@ -1,15 +1,7 @@
-FROM golang:1.4
+FROM alpine
 
-# Godep for vendoring
-RUN go get github.com/tools/godep
-
-ENV APP_DIR $GOPATH/route53-kubernetes
-
-# Set the entrypoint
 ENTRYPOINT ["/opt/app/route53-kubernetes"]
-ADD . $APP_DIR
+RUN mkdir -p /opt/app
+WORKDIR /opt/app
 
-# Compile the binary and statically link
-RUN mkdir /opt/app
-RUN cd $APP_DIR && godep restore
-RUN cd $APP_DIR && go build -o /opt/app/route53-kubernetes
+ADD route53-kubernetes /opt/app/route53-kubernetes
