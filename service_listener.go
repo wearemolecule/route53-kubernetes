@@ -1,9 +1,9 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"time"
@@ -16,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/transport"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
 )
@@ -24,28 +25,49 @@ func main() {
 	flag.Parse()
 	glog.Info("Route53 Update Service")
 	kubernetesService := os.Getenv("KUBERNETES_SERVICE_HOST")
+	kubernetesServicePort := os.Getenv("KUBERNETES_SERVICE_PORT")
 	if kubernetesService == "" {
-		glog.Fatalf("Please specify the Kubernetes server with --server")
+		glog.Fatal("Please specify the Kubernetes server via KUBERNETES_SERVICE_HOST")
 	}
-	apiServer := fmt.Sprintf("https://%s:%s", kubernetesService, os.Getenv("KUBERNETES_SERVICE_PORT"))
+	if kubernetesServicePort == "" {
+		kubernetesServicePort = "443"
+	}
+	apiServer := fmt.Sprintf("https://%s:%s", kubernetesService, kubernetesServicePort)
 
-	token, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
+	caFilePath := os.Getenv("CA_FILE_PATH")
+	certFilePath := os.Getenv("CERT_FILE_PATH")
+	keyFilePath := os.Getenv("KEY_FILE_PATH")
+	if caFilePath == "" || certFilePath == "" || keyFilePath == "" {
+		glog.Fatal("You must provide paths for CA, Cert, and Key files")
+	}
+
+	tls := transport.TLSConfig{
+		CAFile:   caFilePath,
+		CertFile: certFilePath,
+		KeyFile:  keyFilePath,
+	}
+	// tlsTransport := transport.New(transport.Config{TLS: tls})
+	tlsTransport, err := transport.New(&transport.Config{TLS: tls})
 	if err != nil {
-		glog.Fatalf("No service account token found")
+		glog.Fatalf("Couldn't set up tls transport: %s", err)
 	}
 
 	config := client.Config{
-		Host:        apiServer,
-		BearerToken: string(token),
-		Insecure:    true,
+		Host:      apiServer,
+		Transport: tlsTransport,
 	}
 
 	c, err := client.New(&config)
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
+	glog.Infof("Connected to kubernetes @ %s", apiServer)
 
-	creds := credentials.NewCredentials(&ec2rolecreds.EC2RoleProvider{})
+	creds := credentials.NewChainCredentials(
+		[]credentials.Provider{
+			&credentials.SharedCredentialsProvider{},
+			&ec2rolecreds.EC2RoleProvider{},
+		})
 	// Hardcode region to us-east-1 for now. Perhaps fetch through metadata service
 	// curl http://169.254.169.254/latest/meta-data/placement/availability-zone
 	awsConfig := aws.NewConfig()
@@ -55,6 +77,9 @@ func main() {
 
 	r53Api := route53.New(sess)
 	elbApi := elb.New(sess)
+	if r53Api == nil || elbApi == nil {
+		glog.Fatal("Failed to make AWS connection")
+	}
 
 	selector := "dns=route53"
 	l, err := labels.Parse(selector)
@@ -75,16 +100,11 @@ func main() {
 		glog.Infof("Found %d DNS services in all namespaces with selector %q", len(services.Items), selector)
 		for i := range services.Items {
 			s := &services.Items[i]
-			ingress := s.Status.LoadBalancer.Ingress
-			if len(ingress) < 1 {
-				glog.Warningf("No ingress defined for ELB")
+			hn, err := serviceHostname(s)
+			if err != nil {
+				glog.Warningf("Couldn't find hostname: %s", err)
 				continue
 			}
-			if len(ingress) < 1 {
-				glog.Warningf("Multiple ingress points found for ELB, not supported")
-				continue
-			}
-			hn := ingress[0].Hostname
 
 			domain, ok := s.ObjectMeta.Annotations["domainName"]
 			if !ok {
@@ -92,33 +112,17 @@ func main() {
 				continue
 			}
 
-			glog.Infof("Creating DNS for %s service: %s -> %s", i, s.Name, hn, domain)
+			glog.Infof("Creating DNS for %s service: %s -> %s", s.Name, hn, domain)
 			domainParts := strings.Split(domain, ".")
 			segments := len(domainParts)
 			tld := strings.Join(domainParts[segments-2:], ".")
 			subdomain := strings.Join(domainParts[:segments-2], ".")
 
-			elbName := strings.Split(hn, "-")[0]
-			lbInput := &elb.DescribeLoadBalancersInput{
-				LoadBalancerNames: []*string{
-					&elbName,
-				},
-			}
-			resp, err := elbApi.DescribeLoadBalancers(lbInput)
+			hzId, err := hostedZoneId(elbApi, hn)
 			if err != nil {
-				glog.Warningf("Could not describe load balancer: %v", err)
+				glog.Warningf("Couldn't get zone ID: %s", err)
 				continue
 			}
-			descs := resp.LoadBalancerDescriptions
-			if len(descs) < 1 {
-				glog.Warningf("No lb found for %s: %v", tld, err)
-				continue
-			}
-			if len(descs) > 1 {
-				glog.Warningf("Multiple lbs found for %s: %v", tld, err)
-				continue
-			}
-			hzId := descs[0].CanonicalHostedZoneNameID
 
 			listHostedZoneInput := route53.ListHostedZonesByNameInput{
 				DNSName: &tld,
@@ -143,35 +147,74 @@ func main() {
 			zoneParts := strings.Split(zoneId, "/")
 			zoneId = zoneParts[len(zoneParts)-1]
 
-			at := route53.AliasTarget{
-				DNSName:              &hn,
-				EvaluateTargetHealth: aws.Bool(false),
-				HostedZoneId:         hzId,
-			}
-			rrs := route53.ResourceRecordSet{
-				AliasTarget: &at,
-				Name:        &domain,
-				Type:        aws.String("A"),
-			}
-			change := route53.Change{
-				Action:            aws.String("UPSERT"),
-				ResourceRecordSet: &rrs,
-			}
-			batch := route53.ChangeBatch{
-				Changes: []*route53.Change{&change},
-				Comment: aws.String("Kubernetes Update to Service"),
-			}
-			crrsInput := route53.ChangeResourceRecordSetsInput{
-				ChangeBatch:  &batch,
-				HostedZoneId: &zoneId,
-			}
-			_, err = r53Api.ChangeResourceRecordSets(&crrsInput)
-			if err != nil {
-				glog.Warningf("Failed to update record set: %v", err)
+			if err = updateDns(r53Api, hn, hzId, domain, zoneId); err != nil {
+				glog.Warning(err)
 				continue
 			}
 			glog.Infof("Created dns record set: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, zoneId)
 		}
 		time.Sleep(30 * time.Second)
 	}
+}
+
+func serviceHostname(service *api.Service) (string, error) {
+	ingress := service.Status.LoadBalancer.Ingress
+	if len(ingress) < 1 {
+		return "", errors.New("No ingress defined for ELB")
+	}
+	if len(ingress) < 1 {
+		return "", errors.New("Multiple ingress points found for ELB, not supported")
+	}
+	return ingress[0].Hostname, nil
+}
+
+func hostedZoneId(elbApi *elb.ELB, hostname string) (string, error) {
+	elbName := strings.Split(hostname, "-")[0]
+	lbInput := &elb.DescribeLoadBalancersInput{
+		LoadBalancerNames: []*string{
+			&elbName,
+		},
+	}
+	resp, err := elbApi.DescribeLoadBalancers(lbInput)
+	if err != nil {
+		return "", fmt.Errorf("Could not describe load balancer: %v", err)
+	}
+	descs := resp.LoadBalancerDescriptions
+	if len(descs) < 1 {
+		return "", fmt.Errorf("No lb found: %v", err)
+	}
+	if len(descs) > 1 {
+		return "", fmt.Errorf("Multiple lbs found: %v", err)
+	}
+	return *descs[0].CanonicalHostedZoneNameID, nil
+}
+
+func updateDns(r53Api *route53.Route53, hn, hzId, domain, zoneId string) error {
+	at := route53.AliasTarget{
+		DNSName:              &hn,
+		EvaluateTargetHealth: aws.Bool(false),
+		HostedZoneId:         &hzId,
+	}
+	rrs := route53.ResourceRecordSet{
+		AliasTarget: &at,
+		Name:        &domain,
+		Type:        aws.String("A"),
+	}
+	change := route53.Change{
+		Action:            aws.String("UPSERT"),
+		ResourceRecordSet: &rrs,
+	}
+	batch := route53.ChangeBatch{
+		Changes: []*route53.Change{&change},
+		Comment: aws.String("Kubernetes Update to Service"),
+	}
+	crrsInput := route53.ChangeResourceRecordSetsInput{
+		ChangeBatch:  &batch,
+		HostedZoneId: &zoneId,
+	}
+	_, err := r53Api.ChangeResourceRecordSets(&crrsInput)
+	if err != nil {
+		return fmt.Errorf("Failed to update record set: %v", err)
+	}
+	return nil
 }
