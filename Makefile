@@ -3,9 +3,6 @@ TAG=v1.1.0
 BIN=route53-kubernetes
 IMAGE=quay.io/molecule/$(BIN)
 
-setup:
-	glide install
-
 all: image
 	docker push $(IMAGE):$(TAG)
 
@@ -14,6 +11,9 @@ build:
 
 image: build
 	docker build -t $(IMAGE):$(TAG) .
+
+setup:
+	glide install
 
 .PHONY: clean
 
