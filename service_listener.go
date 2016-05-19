@@ -162,7 +162,7 @@ func serviceHostname(service *api.Service) (string, error) {
 	if len(ingress) < 1 {
 		return "", errors.New("No ingress defined for ELB")
 	}
-	if len(ingress) < 1 {
+	if len(ingress) > 1 {
 		return "", errors.New("Multiple ingress points found for ELB, not supported")
 	}
 	return ingress[0].Hostname, nil
