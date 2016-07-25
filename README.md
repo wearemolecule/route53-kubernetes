@@ -4,7 +4,68 @@ This is a Kubernetes service that polls services (in all namespaces) that are co
 with the label `dns=route53` and adds the appropriate alias to the domain specified by
 the annotation `domainName=sub.mydomain.io`.
 
-For example, give the below Kubernetes service definition:
+# Setup
+
+### Build the Image
+
+You may choose to use Docker images for route53-kubernetes on our [Quay](https://quay.io/repository/molecule/route53-kubernetes?tab=tags) namespace or to build the binary, docker image, and push the docker image from scratch. See the [Makefile](https://github.com/wearemolecule/route53-kubernetes/blob/master/Makefile) for more information on doing this process manually.
+
+Note: Use our images at your own risk.
+
+### route53-kubernetes ReplicationController
+
+The following is an example ReplicationController definition for route53-kubernetes:
+
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: route53-kubernetes
+  namespace: kube-system
+  labels:
+    app: route53-kubernetes
+spec:
+  replicas: 1
+  selector:
+    app: route53-kubernetes
+  template:
+    metadata:
+      labels:
+        app: route53-kubernetes
+    spec:
+      volumes:
+        - name: ssl-cert
+          secret:
+            secretName: kube-ssl
+        - name: aws-creds
+          secret:
+            secretName: aws-creds
+      containers:
+        - image: quay.io/molecule/route53-kubernetes:v1.1.1
+          name: route53-kubernetes
+          volumeMounts:
+            - name: ssl-cert
+              mountPath: /opt/certs
+              readOnly: true
+            - name: aws-creds
+              mountPath: /opt/creds
+              readOnly: true
+          env:
+            - name: "CA_FILE_PATH"
+              value: "/opt/certs/ca.pem"
+            - name: "CERT_FILE_PATH"
+              value: "/opt/certs/cert.pem"
+            - name: "KEY_FILE_PATH"
+              value: "/opt/certs/key.pem"
+            - name: "AWS_SHARED_CREDENTIALS_FILE"
+              value: "/opt/creds/credentials"
+```
+
+Create the ReplicationController via `kubectl create -f <name_of_route53-kubernetes-rc.yaml>`
+
+### Service Configuration
+
+Given the following Kubernetes service definition:
 
 ```yaml
 apiVersion: v1
