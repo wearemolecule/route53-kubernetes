@@ -65,8 +65,9 @@ func main() {
 
 	creds := credentials.NewChainCredentials(
 		[]credentials.Provider{
+			&credentials.EnvProvider{},
 			&credentials.SharedCredentialsProvider{},
-			&ec2rolecreds.EC2RoleProvider{},
+			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
 		})
 	// Hardcode region to us-east-1 for now. Perhaps fetch through metadata service
 	// curl http://169.254.169.254/latest/meta-data/placement/availability-zone
