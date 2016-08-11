@@ -1,6 +1,6 @@
-package: ""
+package: route53-kubernetes
 import:
 - package: k8s.io/kubernetes
-  version: v1.2.0-alpha.7
+  version: v1.3.4
 - package: github.com/aws/aws-sdk-go
-  version: v1.1.0
+  version: c924893c38ecc04b18d7aab8a7aa561cb8b4c4cc

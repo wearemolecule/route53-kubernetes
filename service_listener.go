@@ -11,11 +11,13 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/credentials/ec2rolecreds"
+	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/elb"
 	"github.com/aws/aws-sdk-go/service/route53"
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/client/restclient"
 	"k8s.io/kubernetes/pkg/client/transport"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
@@ -52,7 +54,7 @@ func main() {
 		glog.Fatalf("Couldn't set up tls transport: %s", err)
 	}
 
-	config := client.Config{
+	config := restclient.Config{
 		Host:      apiServer,
 		Transport: tlsTransport,
 	}
@@ -63,17 +65,23 @@ func main() {
 	}
 	glog.Infof("Connected to kubernetes @ %s", apiServer)
 
+	metadata := ec2metadata.New(session.New())
+
 	creds := credentials.NewChainCredentials(
 		[]credentials.Provider{
 			&credentials.EnvProvider{},
 			&credentials.SharedCredentialsProvider{},
-			&ec2rolecreds.EC2RoleProvider{Client: ec2metadata.New(session.New())},
+			&ec2rolecreds.EC2RoleProvider{Client: metadata},
 		})
-	// Hardcode region to us-east-1 for now. Perhaps fetch through metadata service
-	// curl http://169.254.169.254/latest/meta-data/placement/availability-zone
+
+	region, err := metadata.Region()
+	if err != nil {
+		glog.Fatalf("Unable to retrieve the region from the EC2 instance %v\n", err)
+	}
+
 	awsConfig := aws.NewConfig()
 	awsConfig.WithCredentials(creds)
-	awsConfig.WithRegion("us-east-1")
+	awsConfig.WithRegion(region)
 	sess := session.New(awsConfig)
 
 	r53Api := route53.New(sess)
