@@ -124,6 +124,10 @@ func main() {
 			glog.Infof("Creating DNS for %s service: %s -> %s", s.Name, hn, domain)
 			domainParts := strings.Split(domain, ".")
 			segments := len(domainParts)
+			if segments < 3 {
+				glog.Warningf("Domain %s is invalid - it should be a fully qualified domain name and subdomain (i.e. test.example.com)", domain)
+				continue
+			}
 			tld := strings.Join(domainParts[segments-2:], ".")
 			subdomain := strings.Join(domainParts[:segments-2], ".")
 
