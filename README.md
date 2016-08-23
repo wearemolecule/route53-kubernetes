@@ -41,7 +41,7 @@ spec:
           secret:
             secretName: aws-creds
       containers:
-        - image: quay.io/molecule/route53-kubernetes:v1.1.2
+        - image: quay.io/molecule/route53-kubernetes:v1.1.3
           name: route53-kubernetes
           volumeMounts:
             - name: ssl-cert
@@ -87,7 +87,7 @@ spec:
           hostPath:
             path: "/etc/kubernetes"
       containers:
-        - image: quay.io/molecule/route53-kubernetes:v1.1.2
+        - image: quay.io/molecule/route53-kubernetes:v1.1.3
           imagePullPolicy: Always
           name: route53-kubernetes
           volumeMounts:
