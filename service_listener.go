@@ -181,15 +181,27 @@ func serviceHostname(service *api.Service) (string, error) {
 	return ingress[0].Hostname, nil
 }
 
-func hostedZoneId(elbApi *elb.ELB, hostname string) (string, error) {
+func loadBalancerNameFromHostname(hostname string) (string, error) {
+	var name string
 	hostnameSegments := strings.Split(hostname, "-")
-	elbName := hostnameSegments[0]
-	
-	// handle internal load balancer naming
-	if elbName == "internal" {
-		elbName = hostnameSegments[1]
+	if len(hostnameSegments) < 2 {
+		return name, fmt.Errorf("%s is not a valid ELB hostname", hostname)
 	}
-	
+	name = hostnameSegments[0]
+
+	// handle internal load balancer naming
+	if name == "internal" {
+		name = hostnameSegments[1]
+	}
+
+	return name, nil
+}
+
+func hostedZoneId(elbApi *elb.ELB, hostname string) (string, error) {
+	elbName, err := loadBalancerNameFromHostname(hostname)
+	if err != nil {
+		return "", fmt.Errorf("Couldn't parse ELB hostname: %v", err)
+	}
 	lbInput := &elb.DescribeLoadBalancersInput{
 		LoadBalancerNames: []*string{
 			&elbName,
