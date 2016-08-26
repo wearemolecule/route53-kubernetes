@@ -85,8 +85,8 @@ func main() {
 	sess := session.New(awsConfig)
 
 	r53Api := route53.New(sess)
-	elbApi := elb.New(sess)
-	if r53Api == nil || elbApi == nil {
+	elbAPI := elb.New(sess)
+	if r53Api == nil || elbAPI == nil {
 		glog.Fatal("Failed to make AWS connection")
 	}
 
@@ -131,7 +131,7 @@ func main() {
 			tld := strings.Join(domainParts[segments-2:], ".")
 			subdomain := strings.Join(domainParts[:segments-2], ".")
 
-			hzId, err := hostedZoneId(elbApi, hn)
+			hzID, err := hostedZoneID(elbAPI, hn)
 			if err != nil {
 				glog.Warningf("Couldn't get zone ID: %s", err)
 				continue
@@ -156,15 +156,15 @@ func main() {
 				glog.Warningf("Zone found %s does not match tld given %s", *zones[0].Name, tld)
 				continue
 			}
-			zoneId := *zones[0].Id
-			zoneParts := strings.Split(zoneId, "/")
-			zoneId = zoneParts[len(zoneParts)-1]
+			zoneID := *zones[0].Id
+			zoneParts := strings.Split(zoneID, "/")
+			zoneID = zoneParts[len(zoneParts)-1]
 
-			if err = updateDns(r53Api, hn, hzId, domain, zoneId); err != nil {
+			if err = updateDNS(r53Api, hn, hzID, domain, zoneID); err != nil {
 				glog.Warning(err)
 				continue
 			}
-			glog.Infof("Created dns record set: tld=%s, subdomain=%s, zoneId=%s", tld, subdomain, zoneId)
+			glog.Infof("Created dns record set: tld=%s, subdomain=%s, zoneID=%s", tld, subdomain, zoneID)
 		}
 		time.Sleep(30 * time.Second)
 	}
@@ -197,7 +197,7 @@ func loadBalancerNameFromHostname(hostname string) (string, error) {
 	return name, nil
 }
 
-func hostedZoneId(elbApi *elb.ELB, hostname string) (string, error) {
+func hostedZoneID(elbAPI *elb.ELB, hostname string) (string, error) {
 	elbName, err := loadBalancerNameFromHostname(hostname)
 	if err != nil {
 		return "", fmt.Errorf("Couldn't parse ELB hostname: %v", err)
@@ -207,7 +207,7 @@ func hostedZoneId(elbApi *elb.ELB, hostname string) (string, error) {
 			&elbName,
 		},
 	}
-	resp, err := elbApi.DescribeLoadBalancers(lbInput)
+	resp, err := elbAPI.DescribeLoadBalancers(lbInput)
 	if err != nil {
 		return "", fmt.Errorf("Could not describe load balancer: %v", err)
 	}
@@ -221,11 +221,11 @@ func hostedZoneId(elbApi *elb.ELB, hostname string) (string, error) {
 	return *descs[0].CanonicalHostedZoneNameID, nil
 }
 
-func updateDns(r53Api *route53.Route53, hn, hzId, domain, zoneId string) error {
+func updateDNS(r53Api *route53.Route53, hn, hzID, domain, zoneID string) error {
 	at := route53.AliasTarget{
 		DNSName:              &hn,
 		EvaluateTargetHealth: aws.Bool(false),
-		HostedZoneId:         &hzId,
+		HostedZoneId:         &hzID,
 	}
 	rrs := route53.ResourceRecordSet{
 		AliasTarget: &at,
@@ -242,7 +242,7 @@ func updateDns(r53Api *route53.Route53, hn, hzId, domain, zoneId string) error {
 	}
 	crrsInput := route53.ChangeResourceRecordSetsInput{
 		ChangeBatch:  &batch,
-		HostedZoneId: &zoneId,
+		HostedZoneId: &zoneID,
 	}
 	_, err := r53Api.ChangeResourceRecordSets(&crrsInput)
 	if err != nil {
