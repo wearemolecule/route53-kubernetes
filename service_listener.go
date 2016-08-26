@@ -182,7 +182,14 @@ func serviceHostname(service *api.Service) (string, error) {
 }
 
 func hostedZoneId(elbApi *elb.ELB, hostname string) (string, error) {
-	elbName := strings.Split(hostname, "-")[0]
+	hostnameSegments := strings.Split(hostname, "-")
+	elbName := hostnameSegments[0]
+	
+	// handle internal load balancer naming
+	if elbName == 'internal' {
+		elbName := hostnameSegments[1]
+	}
+	
 	lbInput := &elb.DescribeLoadBalancersInput{
 		LoadBalancerNames: []*string{
 			&elbName,
