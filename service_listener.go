@@ -187,7 +187,7 @@ func hostedZoneId(elbApi *elb.ELB, hostname string) (string, error) {
 	
 	// handle internal load balancer naming
 	if elbName == 'internal' {
-		elbName := hostnameSegments[1]
+		elbName = hostnameSegments[1]
 	}
 	
 	lbInput := &elb.DescribeLoadBalancersInput{
