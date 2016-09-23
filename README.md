@@ -2,28 +2,18 @@
 
 This is a Kubernetes service that polls services (in all namespaces) that are configured
 with the label `dns=route53` and adds the appropriate alias to the domain specified by
-the annotation `domainName=sub.mydomain.io`.
+the annotation `domainName=sub.mydomain.io`. Multiple domains and top level domains are also supported:
+`domainName=.mydomain.io,sub1.mydomain.io,sub2.mydomain.io`
 
-# Setup
-
-### Install dependencies
-
-We use glide to manage dependencies. To fetch the dependencies to your local `vendor/` folder please run:
-```bash
-glide install -v
-```
-
-### Build the Image
-
-You may choose to use Docker images for route53-kubernetes on our [Quay](https://quay.io/repository/molecule/route53-kubernetes?tab=tags) namespace or to build the binary, docker image, and push the docker image from scratch. See the [Makefile](https://github.com/wearemolecule/route53-kubernetes/blob/master/Makefile) for more information on doing this process manually.
-
-Note: Use our images at your own risk.
+# Usage
 
 ### route53-kubernetes ReplicationController
 
 The following is an example ReplicationController definition for route53-kubernetes:
 
 Create the ReplicationController via `kubectl create -f <name_of_route53-kubernetes-rc.yaml>`
+
+Note: We don't currently sign our docker images. So, please use our images at your own risk.
 
 ```yaml
 apiVersion: v1
@@ -43,7 +33,7 @@ spec:
         app: route53-kubernetes
     spec:
       containers:
-        - image: quay.io/molecule/route53-kubernetes:v1.1.5
+        - image: quay.io/molecule/route53-kubernetes:v1.2.0
           name: route53-kubernetes
 ```
 
@@ -157,3 +147,16 @@ spec:
             - name: "AWS_SHARED_CREDENTIALS_FILE"
               value: "/opt/creds/credentials"
 ```
+
+# Building locally
+
+### Install dependencies
+
+We use glide to manage dependencies. To fetch the dependencies to your local `vendor/` folder please run:
+```bash
+glide install -v
+```
+
+### Build the Image
+
+You may choose to use Docker images for route53-kubernetes on our [Quay](https://quay.io/repository/molecule/route53-kubernetes?tab=tags) namespace or to build the binary, docker image, and push the docker image from scratch. See the [Makefile](https://github.com/wearemolecule/route53-kubernetes/blob/master/Makefile) for more information on doing this process manually.
