@@ -1,5 +1,5 @@
 GO=CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go
-TAG=v1.1.4
+TAG=v1.1.5
 BIN=route53-kubernetes
 IMAGE=quay.io/molecule/$(BIN)
 

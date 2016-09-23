@@ -27,11 +27,8 @@ func main() {
 	flag.Parse()
 	glog.Info("Route53 Update Service")
 	
-	var config restclient.Config
-	clusterConfig, err := restclient.InClusterConfig()
-	if err == nil {
-		config = *clusterConfig
-	} else {
+	config, err := restclient.InClusterConfig()
+	if err != nil {
 		kubernetesService := os.Getenv("KUBERNETES_SERVICE_HOST")
 		kubernetesServicePort := os.Getenv("KUBERNETES_SERVICE_PORT")
 		if kubernetesService == "" {
@@ -60,13 +57,13 @@ func main() {
 			glog.Fatalf("Couldn't set up tls transport: %s", err)
 		}
 	
-		config = restclient.Config{
+		config = &restclient.Config{
 			Host:      apiServer,
 			Transport: tlsTransport,
 		}
 	}
 
-	c, err := client.New(&config)
+	c, err := client.New(config)
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
