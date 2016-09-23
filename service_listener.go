@@ -26,7 +26,7 @@ import (
 func main() {
 	flag.Parse()
 	glog.Info("Route53 Update Service")
-	
+
 	config, err := restclient.InClusterConfig()
 	if err != nil {
 		kubernetesService := os.Getenv("KUBERNETES_SERVICE_HOST")
@@ -38,14 +38,14 @@ func main() {
 			kubernetesServicePort = "443"
 		}
 		apiServer := fmt.Sprintf("https://%s:%s", kubernetesService, kubernetesServicePort)
-	
+
 		caFilePath := os.Getenv("CA_FILE_PATH")
 		certFilePath := os.Getenv("CERT_FILE_PATH")
 		keyFilePath := os.Getenv("KEY_FILE_PATH")
 		if caFilePath == "" || certFilePath == "" || keyFilePath == "" {
 			glog.Fatal("You must provide paths for CA, Cert, and Key files")
 		}
-	
+
 		tls := transport.TLSConfig{
 			CAFile:   caFilePath,
 			CertFile: certFilePath,
@@ -56,7 +56,7 @@ func main() {
 		if err != nil {
 			glog.Fatalf("Couldn't set up tls transport: %s", err)
 		}
-	
+
 		config = &restclient.Config{
 			Host:      apiServer,
 			Transport: tlsTransport,
@@ -119,56 +119,61 @@ func main() {
 				continue
 			}
 
-			domain, ok := s.ObjectMeta.Annotations["domainName"]
+			annotation, ok := s.ObjectMeta.Annotations["domainName"]
 			if !ok {
 				glog.Warningf("Domain name not set for %s", s.Name)
 				continue
 			}
 
-			glog.Infof("Creating DNS for %s service: %s -> %s", s.Name, hn, domain)
-			domainParts := strings.Split(domain, ".")
-			segments := len(domainParts)
-			if segments < 3 {
-				glog.Warningf("Domain %s is invalid - it should be a fully qualified domain name and subdomain (i.e. test.example.com)", domain)
-				continue
-			}
-			tld := strings.Join(domainParts[segments-2:], ".")
-			subdomain := strings.Join(domainParts[:segments-2], ".")
+			domains := strings.Split(annotation, ",")
+			for j := range domains {
+				domain := domains[j]
 
-			hzID, err := hostedZoneID(elbAPI, hn)
-			if err != nil {
-				glog.Warningf("Couldn't get zone ID: %s", err)
-				continue
-			}
+				glog.Infof("Creating DNS for %s service: %s -> %s", s.Name, hn, domain)
+				domainParts := strings.Split(domain, ".")
+				segments := len(domainParts)
+				if segments < 3 {
+					glog.Warningf("Domain %s is invalid - it should be a fully qualified domain name and subdomain (i.e. test.example.com)", domain)
+					continue
+				}
+				tld := strings.Join(domainParts[segments-2:], ".")
+				subdomain := strings.Join(domainParts[:segments-2], ".")
 
-			listHostedZoneInput := route53.ListHostedZonesByNameInput{
-				DNSName: &tld,
-			}
-			hzOut, err := r53Api.ListHostedZonesByName(&listHostedZoneInput)
-			if err != nil {
-				glog.Warningf("No zone found for %s: %v", tld, err)
-				continue
-			}
-			zones := hzOut.HostedZones
-			if len(zones) < 1 {
-				glog.Warningf("No zone found for %s", tld)
-				continue
-			}
-			// The AWS API may return more than one zone, the first zone should be the relevant one
-			tldWithDot := fmt.Sprint(tld, ".")
-			if *zones[0].Name != tldWithDot {
-				glog.Warningf("Zone found %s does not match tld given %s", *zones[0].Name, tld)
-				continue
-			}
-			zoneID := *zones[0].Id
-			zoneParts := strings.Split(zoneID, "/")
-			zoneID = zoneParts[len(zoneParts)-1]
+				hzID, err := hostedZoneID(elbAPI, hn)
+				if err != nil {
+					glog.Warningf("Couldn't get zone ID: %s", err)
+					continue
+				}
 
-			if err = updateDNS(r53Api, hn, hzID, domain, zoneID); err != nil {
-				glog.Warning(err)
-				continue
+				listHostedZoneInput := route53.ListHostedZonesByNameInput{
+					DNSName: &tld,
+				}
+				hzOut, err := r53Api.ListHostedZonesByName(&listHostedZoneInput)
+				if err != nil {
+					glog.Warningf("No zone found for %s: %v", tld, err)
+					continue
+				}
+				zones := hzOut.HostedZones
+				if len(zones) < 1 {
+					glog.Warningf("No zone found for %s", tld)
+					continue
+				}
+				// The AWS API may return more than one zone, the first zone should be the relevant one
+				tldWithDot := fmt.Sprint(tld, ".")
+				if *zones[0].Name != tldWithDot {
+					glog.Warningf("Zone found %s does not match tld given %s", *zones[0].Name, tld)
+					continue
+				}
+				zoneID := *zones[0].Id
+				zoneParts := strings.Split(zoneID, "/")
+				zoneID = zoneParts[len(zoneParts)-1]
+
+				if err = updateDNS(r53Api, hn, hzID, domain, zoneID); err != nil {
+					glog.Warning(err)
+					continue
+				}
+				glog.Infof("Created dns record set: tld=%s, subdomain=%s, zoneID=%s", tld, subdomain, zoneID)
 			}
-			glog.Infof("Created dns record set: tld=%s, subdomain=%s, zoneID=%s", tld, subdomain, zoneID)
 		}
 		time.Sleep(30 * time.Second)
 	}
