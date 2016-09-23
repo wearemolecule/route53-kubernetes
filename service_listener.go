@@ -164,7 +164,7 @@ func main() {
 			zoneParts := strings.Split(zoneID, "/")
 			zoneID = zoneParts[len(zoneParts)-1]
 
-			if err = updateDNS(r53Api, hn, hzID, domain, zoneID); err != nil {
+			if err = updateDNS(r53Api, hn, hzID, strings.TrimLeft(domain, "."), zoneID); err != nil {
 				glog.Warning(err)
 				continue
 			}
