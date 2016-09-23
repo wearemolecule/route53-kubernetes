@@ -1,31 +1,31 @@
-hash: 2da58f0fb20a459666d0528d53592eb28f9116f4e8b7314d166863ee9b177500
-updated: 2016-08-23T10:29:22.35862826-05:00
+hash: a300272a5e6a1abc109bdd35b981375ee5e337ae19c6f01994ac294f3835173b
+updated: 2016-09-23T10:43:50.238036501-05:00
 imports:
 - name: github.com/aws/aws-sdk-go
   version: c924893c38ecc04b18d7aab8a7aa561cb8b4c4cc
   subpackages:
   - aws
-  - aws/credentials
-  - aws/credentials/ec2rolecreds
-  - aws/ec2metadata
-  - aws/session
-  - service/elb
-  - service/route53
   - aws/awserr
+  - aws/awsutil
   - aws/client
   - aws/client/metadata
-  - aws/request
   - aws/corehandlers
+  - aws/credentials
+  - aws/credentials/ec2rolecreds
   - aws/defaults
+  - aws/ec2metadata
+  - aws/request
+  - aws/session
   - private/endpoints
-  - aws/awsutil
   - private/protocol/query
+  - private/protocol/query/queryutil
+  - private/protocol/rest
+  - private/protocol/restxml
+  - private/protocol/xml/xmlutil
   - private/signer/v4
   - private/waiter
-  - private/protocol/restxml
-  - private/protocol/query/queryutil
-  - private/protocol/xml/xmlutil
-  - private/protocol/rest
+  - service/elb
+  - service/route53
 - name: github.com/beorn7/perks
   version: 3ac7bf7a47d159a033b107610db8a1b6575507a4
   subpackages:
@@ -249,10 +249,10 @@ imports:
   - internal/log
   - internal/modules
   - internal/remote_api
-  - urlfetch
   - internal/urlfetch
+  - urlfetch
 - name: google.golang.org/cloud
-  version: ""
+  version: eb47ba841d53d93506cfbfbc03927daf9cc48f88
   subpackages:
   - compute/metadata
   - internal
@@ -264,96 +264,96 @@ imports:
   version: dd6b458ef8dbf24aff55795baa68f83383c9b3a9
   subpackages:
   - pkg/api
-  - pkg/client/restclient
-  - pkg/client/transport
-  - pkg/client/unversioned
-  - pkg/labels
+  - pkg/api/endpoints
+  - pkg/api/errors
+  - pkg/api/install
   - pkg/api/meta
   - pkg/api/meta/metatypes
+  - pkg/api/pod
   - pkg/api/resource
+  - pkg/api/service
   - pkg/api/unversioned
-  - pkg/auth/user
-  - pkg/conversion
-  - pkg/fields
-  - pkg/runtime
-  - pkg/runtime/serializer
-  - pkg/types
-  - pkg/util
-  - pkg/util/intstr
-  - pkg/util/rand
-  - pkg/util/sets
-  - pkg/api/errors
+  - pkg/api/unversioned/validation
+  - pkg/api/util
   - pkg/api/v1
   - pkg/api/validation
-  - pkg/client/metrics
-  - pkg/client/unversioned/clientcmd/api
-  - pkg/runtime/serializer/streaming
-  - pkg/util/crypto
-  - pkg/util/flowcontrol
-  - pkg/util/net
-  - pkg/version
-  - pkg/watch
-  - pkg/watch/versioned
-  - pkg/api/install
+  - pkg/apimachinery
   - pkg/apimachinery/registered
   - pkg/apis/apps
   - pkg/apis/apps/install
+  - pkg/apis/apps/v1alpha1
+  - pkg/apis/authentication.k8s.io
   - pkg/apis/authentication.k8s.io/install
+  - pkg/apis/authentication.k8s.io/v1beta1
+  - pkg/apis/authorization
   - pkg/apis/authorization/install
+  - pkg/apis/authorization/v1beta1
   - pkg/apis/autoscaling
   - pkg/apis/autoscaling/install
+  - pkg/apis/autoscaling/v1
   - pkg/apis/batch
   - pkg/apis/batch/install
+  - pkg/apis/batch/v1
   - pkg/apis/batch/v2alpha1
+  - pkg/apis/componentconfig
   - pkg/apis/componentconfig/install
+  - pkg/apis/componentconfig/v1alpha1
   - pkg/apis/extensions
   - pkg/apis/extensions/install
+  - pkg/apis/extensions/v1beta1
   - pkg/apis/policy
   - pkg/apis/policy/install
+  - pkg/apis/policy/v1alpha1
   - pkg/apis/rbac
   - pkg/apis/rbac/install
+  - pkg/apis/rbac/v1alpha1
+  - pkg/auth/user
+  - pkg/capabilities
+  - pkg/client/metrics
+  - pkg/client/restclient
+  - pkg/client/transport
   - pkg/client/typed/discovery
-  - pkg/util/wait
-  - plugin/pkg/client/auth
-  - pkg/util/validation
-  - pkg/util/errors
-  - third_party/forked/reflect
+  - pkg/client/unversioned
+  - pkg/client/unversioned/clientcmd/api
+  - pkg/conversion
   - pkg/conversion/queryparams
-  - pkg/util/json
+  - pkg/fields
+  - pkg/kubelet/qos
+  - pkg/kubelet/qos/util
+  - pkg/labels
+  - pkg/master/ports
+  - pkg/runtime
+  - pkg/runtime/serializer
   - pkg/runtime/serializer/json
   - pkg/runtime/serializer/protobuf
   - pkg/runtime/serializer/recognizer
+  - pkg/runtime/serializer/streaming
   - pkg/runtime/serializer/versioning
-  - pkg/util/validation/field
-  - pkg/util/parsers
-  - pkg/api/endpoints
-  - pkg/api/pod
-  - pkg/api/service
-  - pkg/api/unversioned/validation
-  - pkg/api/util
-  - pkg/capabilities
-  - pkg/util/yaml
-  - pkg/util/integer
-  - pkg/util/runtime
-  - pkg/apimachinery
-  - pkg/apis/apps/v1alpha1
-  - pkg/apis/authentication.k8s.io
-  - pkg/apis/authentication.k8s.io/v1beta1
-  - pkg/apis/authorization
-  - pkg/apis/authorization/v1beta1
-  - pkg/apis/autoscaling/v1
-  - pkg/apis/batch/v1
-  - pkg/apis/componentconfig
-  - pkg/apis/componentconfig/v1alpha1
-  - pkg/apis/extensions/v1beta1
-  - pkg/apis/policy/v1alpha1
-  - pkg/apis/rbac/v1alpha1
-  - plugin/pkg/client/auth/gcp
-  - plugin/pkg/client/auth/oidc
+  - pkg/types
+  - pkg/util
+  - pkg/util/crypto
+  - pkg/util/errors
+  - pkg/util/flowcontrol
   - pkg/util/framer
   - pkg/util/hash
+  - pkg/util/integer
+  - pkg/util/intstr
+  - pkg/util/json
+  - pkg/util/net
   - pkg/util/net/sets
-  - pkg/kubelet/qos
-  - pkg/master/ports
-  - pkg/kubelet/qos/util
+  - pkg/util/parsers
+  - pkg/util/rand
+  - pkg/util/runtime
+  - pkg/util/sets
+  - pkg/util/validation
+  - pkg/util/validation/field
+  - pkg/util/wait
+  - pkg/util/yaml
+  - pkg/version
+  - pkg/watch
+  - pkg/watch/versioned
+  - plugin/pkg/client/auth
+  - plugin/pkg/client/auth/gcp
+  - plugin/pkg/client/auth/oidc
+  - third_party/forked/reflect
 testImports: []
