@@ -23,6 +23,96 @@ Note: Use our images at your own risk.
 
 The following is an example ReplicationController definition for route53-kubernetes:
 
+Create the ReplicationController via `kubectl create -f <name_of_route53-kubernetes-rc.yaml>`
+
+```yaml
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: route53-kubernetes
+  namespace: kube-system
+  labels:
+    app: route53-kubernetes
+spec:
+  replicas: 1
+  selector:
+    app: route53-kubernetes
+  template:
+    metadata:
+      labels:
+        app: route53-kubernetes
+    spec:
+      containers:
+        - image: quay.io/molecule/route53-kubernetes:v1.1.5
+          name: route53-kubernetes
+```
+
+This service expects that it's running on a Kubernetes node on AWS and that the IAM profile for
+that node is set up to allow the following, along with the default permissions needed by Kubernetes:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "route53:ListHostedZonesByName",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "elasticloadbalancing:DescribeLoadBalancers",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "route53:ChangeResourceRecordSets",
+            "Resource": "*"
+        }
+    ]
+}
+```
+
+### Service Configuration
+
+Given the following Kubernetes service definition:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+    role: web
+    dns: route53
+  annotations:
+    domainName: "test.mydomain.com"
+spec:
+  selector:
+    app: my-app
+    role: web
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+    targetPort: web
+  - name: web-ssl
+    port: 443
+    protocol: TCP
+    targetPort: web-ssl
+  type: LoadBalancer
+```
+
+An "A" record for `test.mydomain.com` will be created as an alias to the ELB that is
+configured by kubernetes. This assumes that a hosted zone exists in Route53 for mydomain.com.
+Any record that previously existed for that dns record will be updated.
+
+
+### Alternative setup
+
+This setup shows some alternative ways to configure route53-kubernetes. First, you can specify kubernetes certs manually if you do not have service accounts enabled. Second, access to AWS can be configured through a [Shared Credentials File](https://github.com/aws/aws-sdk-go/wiki/configuring-sdk).
+
 ```yaml
 apiVersion: v1
 kind: ReplicationController
@@ -66,109 +156,4 @@ spec:
               value: "/opt/certs/key.pem"
             - name: "AWS_SHARED_CREDENTIALS_FILE"
               value: "/opt/creds/credentials"
-```
-
-Create the ReplicationController via `kubectl create -f <name_of_route53-kubernetes-rc.yaml>`
-
-The following can be an easier alternative if you use IAM Role instead of [Shared Credentials File](https://github.com/aws/aws-sdk-go/wiki/configuring-sdk):
-
-```yaml
-apiVersion: v1
-kind: ReplicationController
-metadata:
-  name: route53-kubernetes
-  namespace: kube-system
-  labels:
-    app: route53-kubernetes
-spec:
-  replicas: 1
-  selector:
-    app: route53-kubernetes
-  template:
-    metadata:
-      labels:
-        app: route53-kubernetes
-    spec:
-      volumes:
-        - name: ssl-cert
-          hostPath:
-            path: "/etc/kubernetes"
-      containers:
-        - image: quay.io/molecule/route53-kubernetes:v1.1.3
-          imagePullPolicy: Always
-          name: route53-kubernetes
-          volumeMounts:
-            - name: ssl-cert
-              mountPath: /etc/kubernetes
-              readOnly: true
-          env:
-            - name: "CA_FILE_PATH"
-              value: "/etc/kubernetes/ssl/ca.pem"
-            - name: "CERT_FILE_PATH"
-              value: "/etc/kubernetes/ssl/worker.pem"
-            - name: "KEY_FILE_PATH"
-              value: "/etc/kubernetes/ssl/worker-key.pem"
-            - name : "AWS_REGION"
-              value: "ap-northeast-1"
-```
-
-### Service Configuration
-
-Given the following Kubernetes service definition:
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: my-app
-  labels:
-    app: my-app
-    role: web
-    dns: route53
-  annotations:
-    domainName: "test.mydomain.com"
-spec:
-  selector:
-    app: my-app
-    role: web
-  ports:
-  - name: web
-    port: 80
-    protocol: TCP
-    targetPort: web
-  - name: web-ssl
-    port: 443
-    protocol: TCP
-    targetPort: web-ssl
-  type: LoadBalancer
-```
-
-An "A" record for `test.mydomain.com` will be created as an alias to the ELB that is
-configured by kubernetes. This assumes that a hosted zone exists in Route53 for mydomain.com.
-Any record that previously existed for that dns record will be updated.
-
-This service expects that it's running on a Kubernetes node on AWS and that the IAM profile for
-that node is set up to allow the following, along with the default permissions needed by Kubernetes:
-
-```json
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": "route53:ListHostedZonesByName",
-            "Resource": "*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": "elasticloadbalancing:DescribeLoadBalancers",
-            "Resource": "*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": "route53:ChangeResourceRecordSets",
-            "Resource": "*"
-        }
-    ]
-}
 ```
