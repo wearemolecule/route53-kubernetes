@@ -6,6 +6,13 @@ the annotation `domainName=sub.mydomain.io`.
 
 # Setup
 
+### Install dependencies
+
+We use glide to manage dependencies. To fetch the dependencies to your local `vendor/` folder please run:
+```bash
+glide install -v
+```
+
 ### Build the Image
 
 You may choose to use Docker images for route53-kubernetes on our [Quay](https://quay.io/repository/molecule/route53-kubernetes?tab=tags) namespace or to build the binary, docker image, and push the docker image from scratch. See the [Makefile](https://github.com/wearemolecule/route53-kubernetes/blob/master/Makefile) for more information on doing this process manually.
