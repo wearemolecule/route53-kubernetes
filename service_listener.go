@@ -26,44 +26,48 @@ import (
 func main() {
 	flag.Parse()
 	glog.Info("Route53 Update Service")
-	kubernetesService := os.Getenv("KUBERNETES_SERVICE_HOST")
-	kubernetesServicePort := os.Getenv("KUBERNETES_SERVICE_PORT")
-	if kubernetesService == "" {
-		glog.Fatal("Please specify the Kubernetes server via KUBERNETES_SERVICE_HOST")
-	}
-	if kubernetesServicePort == "" {
-		kubernetesServicePort = "443"
-	}
-	apiServer := fmt.Sprintf("https://%s:%s", kubernetesService, kubernetesServicePort)
-
-	caFilePath := os.Getenv("CA_FILE_PATH")
-	certFilePath := os.Getenv("CERT_FILE_PATH")
-	keyFilePath := os.Getenv("KEY_FILE_PATH")
-	if caFilePath == "" || certFilePath == "" || keyFilePath == "" {
-		glog.Fatal("You must provide paths for CA, Cert, and Key files")
-	}
-
-	tls := transport.TLSConfig{
-		CAFile:   caFilePath,
-		CertFile: certFilePath,
-		KeyFile:  keyFilePath,
-	}
-	// tlsTransport := transport.New(transport.Config{TLS: tls})
-	tlsTransport, err := transport.New(&transport.Config{TLS: tls})
+	
+	config, err := restclient.InClusterConfig()
 	if err != nil {
-		glog.Fatalf("Couldn't set up tls transport: %s", err)
+		kubernetesService := os.Getenv("KUBERNETES_SERVICE_HOST")
+		kubernetesServicePort := os.Getenv("KUBERNETES_SERVICE_PORT")
+		if kubernetesService == "" {
+			glog.Fatal("Please specify the Kubernetes server via KUBERNETES_SERVICE_HOST")
+		}
+		if kubernetesServicePort == "" {
+			kubernetesServicePort = "443"
+		}
+		apiServer := fmt.Sprintf("https://%s:%s", kubernetesService, kubernetesServicePort)
+	
+		caFilePath := os.Getenv("CA_FILE_PATH")
+		certFilePath := os.Getenv("CERT_FILE_PATH")
+		keyFilePath := os.Getenv("KEY_FILE_PATH")
+		if caFilePath == "" || certFilePath == "" || keyFilePath == "" {
+			glog.Fatal("You must provide paths for CA, Cert, and Key files")
+		}
+	
+		tls := transport.TLSConfig{
+			CAFile:   caFilePath,
+			CertFile: certFilePath,
+			KeyFile:  keyFilePath,
+		}
+		// tlsTransport := transport.New(transport.Config{TLS: tls})
+		tlsTransport, err := transport.New(&transport.Config{TLS: tls})
+		if err != nil {
+			glog.Fatalf("Couldn't set up tls transport: %s", err)
+		}
+	
+		config = &restclient.Config{
+			Host:      apiServer,
+			Transport: tlsTransport,
+		}
 	}
 
-	config := restclient.Config{
-		Host:      apiServer,
-		Transport: tlsTransport,
-	}
-
-	c, err := client.New(&config)
+	c, err := client.New(config)
 	if err != nil {
 		glog.Fatalf("Failed to make client: %v", err)
 	}
-	glog.Infof("Connected to kubernetes @ %s", apiServer)
+	glog.Infof("Connected to kubernetes @ %s", config.Host)
 
 	metadata := ec2metadata.New(session.New())
 
