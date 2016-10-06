@@ -130,53 +130,90 @@ func main() {
 				domain := domains[j]
 
 				glog.Infof("Creating DNS for %s service: %s -> %s", s.Name, hn, domain)
-				domainParts := strings.Split(domain, ".")
-				segments := len(domainParts)
-				if segments < 3 {
-					glog.Warningf("Domain %s is invalid - it should be a fully qualified domain name and subdomain (i.e. test.example.com)", domain)
-					continue
-				}
-				tld := strings.Join(domainParts[segments-2:], ".")
-				subdomain := strings.Join(domainParts[:segments-2], ".")
-
-				hzID, err := hostedZoneID(elbAPI, hn)
+				elbZoneID, err := hostedZoneID(elbAPI, hn)
 				if err != nil {
 					glog.Warningf("Couldn't get zone ID: %s", err)
 					continue
 				}
 
-				listHostedZoneInput := route53.ListHostedZonesByNameInput{
-					DNSName: &tld,
-				}
-				hzOut, err := r53Api.ListHostedZonesByName(&listHostedZoneInput)
+				zone, err := getDestinationZone(domain, r53Api)
 				if err != nil {
-					glog.Warningf("No zone found for %s: %v", tld, err)
+					glog.Warningf("Couldn't find destination zone: %s", err)
 					continue
 				}
-				zones := hzOut.HostedZones
-				if len(zones) < 1 {
-					glog.Warningf("No zone found for %s", tld)
-					continue
-				}
-				// The AWS API may return more than one zone, the first zone should be the relevant one
-				tldWithDot := fmt.Sprint(tld, ".")
-				if *zones[0].Name != tldWithDot {
-					glog.Warningf("Zone found %s does not match tld given %s", *zones[0].Name, tld)
-					continue
-				}
-				zoneID := *zones[0].Id
+
+				zoneID := *zone.Id
 				zoneParts := strings.Split(zoneID, "/")
 				zoneID = zoneParts[len(zoneParts)-1]
 
-				if err = updateDNS(r53Api, hn, hzID, strings.TrimLeft(domain, "."), zoneID); err != nil {
+				if err = updateDNS(r53Api, hn, elbZoneID, strings.TrimLeft(domain, "."), zoneID); err != nil {
 					glog.Warning(err)
 					continue
 				}
-				glog.Infof("Created dns record set: tld=%s, subdomain=%s, zoneID=%s", tld, subdomain, zoneID)
+				glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
 			}
 		}
 		time.Sleep(30 * time.Second)
 	}
+}
+
+func getDestinationZone(domain string, r53Api *route53.Route53) (*route53.HostedZone, error) {
+	tld, err := getTLD(domain)
+	if err != nil {
+		return nil, err
+	}
+
+	listHostedZoneInput := route53.ListHostedZonesByNameInput{
+		DNSName: &tld,
+	}
+	hzOut, err := r53Api.ListHostedZonesByName(&listHostedZoneInput)
+	if err != nil {
+		return nil, fmt.Errorf("No zone found for %s: %v", tld, err)
+	}
+	// TODO: The AWS API may return multiple pages, we should parse them all
+
+	return findMostSpecificZoneForDomain(domain, hzOut.HostedZones)
+}
+
+func findMostSpecificZoneForDomain(domain string, zones []*route53.HostedZone) (*route53.HostedZone, error) {
+	domain = domainWithTrailingDot(domain)
+	if len(zones) < 1 {
+		return nil, fmt.Errorf("No zone found for %s", domain)
+	}
+	var mostSpecific *route53.HostedZone
+	curLen := 0
+
+	for i := range zones {
+		zone := zones[i]
+		zoneName := *zone.Name
+
+		if strings.HasSuffix(domain, zoneName) && curLen < len(zoneName) {
+			curLen = len(zoneName)
+			mostSpecific = zone
+		}
+	}
+
+	if mostSpecific == nil {
+		return nil, fmt.Errorf("Zone found %s does not match domain given %s", *zones[0].Name, domain)
+	}
+
+	return mostSpecific, nil
+}
+
+func getTLD(domain string) (string, error) {
+	domainParts := strings.Split(domain, ".")
+	segments := len(domainParts)
+	if segments < 3 {
+		return "", fmt.Errorf("Domain %s is invalid - it should be a fully qualified domain name and subdomain (i.e. test.example.com)", domain)
+	}
+	return strings.Join(domainParts[segments-2:], "."), nil
+}
+
+func domainWithTrailingDot(withoutDot string) string {
+	if withoutDot[len(withoutDot)-1:] == "." {
+		return withoutDot
+	}
+	return fmt.Sprint(withoutDot, ".")
 }
 
 func serviceHostname(service *api.Service) (string, error) {
