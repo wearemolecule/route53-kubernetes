@@ -23,6 +23,16 @@ import (
 	"k8s.io/kubernetes/pkg/labels"
 )
 
+// Don't actually commit the changes to route53 records, just print out what we would have done.
+var dryRun bool
+
+func init() {
+	dryRunStr := os.Getenv("DRY_RUN")
+	if dryRunStr != "" {
+		dryRun = true
+	}
+}
+
 func main() {
 	flag.Parse()
 	glog.Info("Route53 Update Service")
@@ -290,6 +300,11 @@ func updateDNS(r53Api *route53.Route53, hn, hzID, domain, zoneID string) error {
 		ChangeBatch:  &batch,
 		HostedZoneId: &zoneID,
 	}
+	if dryRun {
+		glog.Infof("DRY RUN: We normally would have updated %s to point to %s (%s)", zoneID, hzID, hn)
+		return nil
+	}
+
 	_, err := r53Api.ChangeResourceRecordSets(&crrsInput)
 	if err != nil {
 		return fmt.Errorf("Failed to update record set: %v", err)
