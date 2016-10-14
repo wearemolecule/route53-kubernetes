@@ -125,7 +125,7 @@ func main() {
 			s := &services.Items[i]
 			hn, err := serviceHostname(s)
 			if err != nil {
-				glog.Warningf("Couldn't find hostname: %s", err)
+				glog.Warningf("Couldn't find hostname for %s: %s", s.Name, err)
 				continue
 			}
 
