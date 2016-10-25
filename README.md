@@ -33,7 +33,7 @@ spec:
         app: route53-kubernetes
     spec:
       containers:
-        - image: quay.io/molecule/route53-kubernetes:v1.2.0
+        - image: quay.io/molecule/route53-kubernetes:v1.3.0
           name: route53-kubernetes
 ```
 
@@ -128,7 +128,7 @@ spec:
           secret:
             secretName: aws-creds
       containers:
-        - image: quay.io/molecule/route53-kubernetes:v1.1.3
+        - image: quay.io/molecule/route53-kubernetes:v1.3.0
           name: route53-kubernetes
           volumeMounts:
             - name: ssl-cert
