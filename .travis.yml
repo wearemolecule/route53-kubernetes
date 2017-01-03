@@ -12,7 +12,7 @@ addons:
     - curl
 
 env:
-  - DOCKER_IMAGE_NAME=cloudposse/route53-kubernetes-ingress
+  - DOCKER_IMAGE_NAME=cloudposse/route53-kubernetess
 
 services:
 - docker
