@@ -114,7 +114,14 @@ func main() {
 	}
 
 	glog.Infof("Starting Service Polling every 30s")
+	awsCallFailed := false
 	for {
+		if awsCallFailed {
+			glog.Info("Noticed failed calls to AWS services, refreshing creds")
+			sess.Config.Credentials.Expire()
+			awsCallFailed = false
+		}
+
 		services, err := c.Services(api.NamespaceAll).List(listOptions)
 		if err != nil {
 			glog.Fatalf("Failed to list pods: %v", err)
@@ -143,12 +150,14 @@ func main() {
 				elbZoneID, err := hostedZoneID(elbAPI, hn)
 				if err != nil {
 					glog.Warningf("Couldn't get zone ID: %s", err)
+					awsCallFailed = true
 					continue
 				}
 
 				zone, err := getDestinationZone(domain, r53Api)
 				if err != nil {
 					glog.Warningf("Couldn't find destination zone: %s", err)
+					awsCallFailed = true
 					continue
 				}
 
@@ -158,6 +167,7 @@ func main() {
 
 				if err = updateDNS(r53Api, hn, elbZoneID, strings.TrimLeft(domain, "."), zoneID); err != nil {
 					glog.Warning(err)
+					awsCallFailed = true
 					continue
 				}
 				glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
