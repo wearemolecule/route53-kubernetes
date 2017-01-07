@@ -21,10 +21,22 @@ import (
 	"k8s.io/kubernetes/pkg/client/transport"
 	client "k8s.io/kubernetes/pkg/client/unversioned"
 	"k8s.io/kubernetes/pkg/labels"
+	"strconv"
 )
 
 // Don't actually commit the changes to route53 records, just print out what we would have done.
 var dryRun bool
+
+const (
+	A  = "A"
+	CNAME = "CNAME"
+)
+
+type rule struct {
+	service       	*api.Service
+	dnsRecordType 	string
+	ttl 		int64
+}
 
 func init() {
 	dryRunStr := os.Getenv("DRY_RUN")
@@ -115,56 +127,195 @@ func main() {
 
 	glog.Infof("Starting Service Polling every 30s")
 	for {
-		services, err := c.Services(api.NamespaceAll).List(listOptions)
-		if err != nil {
-			glog.Fatalf("Failed to list pods: %v", err)
-		}
 
-		glog.Infof("Found %d DNS services in all namespaces with selector %q", len(services.Items), selector)
-		for i := range services.Items {
-			s := &services.Items[i]
-			hn, err := serviceHostname(s)
+		for domain, s := range getDomainServiceMap(c, listOptions) {
+			hn, err := serviceHostname(s.service)
 			if err != nil {
-				glog.Warningf("Couldn't find hostname for %s: %s", s.Name, err)
+				glog.Warningf("Couldn't find hostname for %s: %s", s.service.Name, err)
 				continue
 			}
 
-			annotation, ok := s.ObjectMeta.Annotations["domainName"]
-			if !ok {
-				glog.Warningf("Domain name not set for %s", s.Name)
+			glog.Infof("Creating DNS for %s service: %s -> %s", s.service.Name, hn, domain)
+			elbZoneID, err := hostedZoneID(elbAPI, hn)
+			if err != nil {
+				glog.Warningf("Couldn't get zone ID: %s", err)
 				continue
 			}
 
-			domains := strings.Split(annotation, ",")
-			for j := range domains {
-				domain := domains[j]
-
-				glog.Infof("Creating DNS for %s service: %s -> %s", s.Name, hn, domain)
-				elbZoneID, err := hostedZoneID(elbAPI, hn)
-				if err != nil {
-					glog.Warningf("Couldn't get zone ID: %s", err)
-					continue
-				}
-
-				zone, err := getDestinationZone(domain, r53Api)
-				if err != nil {
-					glog.Warningf("Couldn't find destination zone: %s", err)
-					continue
-				}
-
-				zoneID := *zone.Id
-				zoneParts := strings.Split(zoneID, "/")
-				zoneID = zoneParts[len(zoneParts)-1]
-
-				if err = updateDNS(r53Api, hn, elbZoneID, strings.TrimLeft(domain, "."), zoneID); err != nil {
-					glog.Warning(err)
-					continue
-				}
-				glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
+			zone, err := getDestinationZone(domain, r53Api)
+			if err != nil {
+				glog.Warningf("Couldn't find destination zone: %s", err)
+				continue
 			}
+
+			zoneID := *zone.Id
+			zoneParts := strings.Split(zoneID, "/")
+			zoneID = zoneParts[len(zoneParts) - 1]
+
+			var rrs route53.ResourceRecordSet
+			switch s.dnsRecordType {
+			case A: rrs = makeATypeRecordSet(hn, elbZoneID, strings.TrimLeft(domain, "."), s.ttl)
+			case CNAME: rrs = makeCNAMETypeRecordSet(hn, elbZoneID, strings.TrimLeft(domain, "."), s.ttl)
+			}
+
+			if err = updateDNS(r53Api, zoneID, rrs); err != nil {
+				glog.Warning(err)
+				continue
+			// If no error and it was dryRun then log info about this
+			} else if dryRun {
+				glog.Infof("DRY RUN: We normally would have updated %s to point %s to %s (%s)", zoneID, domain, hn, elbZoneID)
+			}
+
+			glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
 		}
 		time.Sleep(30 * time.Second)
 	}
+}
+
+func getDomainServiceMap(c *client.Client, listOptions api.ListOptions) map[string]rule {
+	result := make(map[string]rule)
+
+	result = getServiceBasedDomainServiceMap(result, c, listOptions)
+	result = getIngressBasedDomainServiceMap(result, c, listOptions)
+
+	return result
+}
+
+func getServiceBasedDomainServiceMap(result map[string]rule, c *client.Client, listOptions api.ListOptions) map[string]rule {
+	services, err := c.Services(api.NamespaceAll).List(listOptions)
+	if err != nil {
+		glog.Fatalf("Failed to list services: %v", err)
+		return result
+	}
+
+	glog.Infof("Found %v DNS services in all namespaces with selector", len(services.Items))
+	for _, service := range services.Items {
+		dnsRecordType, ok := service.ObjectMeta.Annotations["dnsRecordType"]
+		if !ok || !isDNSRecordTypeValid(dnsRecordType)  {
+			dnsRecordType = defaultDNSRecordType()
+		}
+
+		ttl := defaultDNSRecordTTL()
+
+		ttlString, ok := service.ObjectMeta.Annotations["dnsRecordTTL"]
+		if ok && parseTTL(ttlString) != 0  {
+			ttl = parseTTL(ttlString)
+		}
+
+
+		annotation, ok := service.ObjectMeta.Annotations["domainName"]
+		if ok {
+			domains := strings.Split(annotation, ",")
+			for _, domain := range domains {
+				result[domain] = rule { service: &service, dnsRecordType: dnsRecordType, ttl: ttl }
+			}
+		} else {
+			glog.Warningf("Domain name not set for %s", service.Name)
+		}
+
+	}
+	return result
+}
+
+func getIngressBasedDomainServiceMap(result map[string]rule, c *client.Client, listOptions api.ListOptions) map[string]rule {
+	service := getIngressService(c)
+
+	if service == nil {
+		return result
+	}
+
+	ingresses, err := c.Ingress(api.NamespaceAll).List(listOptions)
+	if err != nil {
+		glog.Fatalf("Failed to list ingress: %v", err)
+		return result
+	}
+
+	glog.Infof("Found %v DNS ingress in all namespaces", len(ingresses.Items))
+
+	for _, ingress := range ingresses.Items {
+		dnsRecordType, ok := service.ObjectMeta.Annotations["dnsRecordType"]
+		if !ok || !isDNSRecordTypeValid(dnsRecordType)  {
+			dnsRecordType = defaultDNSRecordType()
+		}
+
+		ttl := defaultDNSRecordTTL()
+
+		ttlString, ok := service.ObjectMeta.Annotations["dnsRecordTTL"]
+		if ok && parseTTL(ttlString) != 0  {
+			ttl = parseTTL(ttlString)
+		}
+
+		// ingress
+		annotation, ok := ingress.ObjectMeta.Annotations["domainName"]
+		if ok {
+			domains := strings.Split(annotation, ",")
+			for _, domain := range domains {
+				result[domain] = rule{ service: service, dnsRecordType: dnsRecordType, ttl: ttl }
+			}
+		} else {
+			glog.Warningf("Domain name not set for %s", ingress.Name)
+		}
+	}
+	return result
+}
+
+func defaultDNSRecordType() string {
+	dnsRecordType := os.Getenv("DNS_RECORD_TYPE")
+	if dnsRecordType == "" || !isDNSRecordTypeValid(dnsRecordType) {
+		dnsRecordType = A
+	}
+	return dnsRecordType
+}
+
+func defaultDNSRecordTTL() int64 {
+	ttl := parseTTL(os.Getenv("DNS_RECORD_TTL"))
+	if ttl == 0  {
+		ttl = 300
+	}
+	return ttl
+}
+
+func isDNSRecordTypeValid(dnsRecordType string) bool {
+	return dnsRecordType == A || dnsRecordType == CNAME
+}
+
+
+func parseTTL(ttl string) int64 {
+	result, err := strconv.Atoi(ttl)
+	if err != nil {
+		return 0
+	} else if result <= 0 {
+		return 0
+	}
+	return int64(result)
+}
+
+func getIngressService(c *client.Client)*api.Service {
+	selector := os.Getenv("INGRESS_SERVICE_SELECTOR")
+	if selector == "" {
+		selector = "ingress=endpoint"
+	}
+
+	glog.Infof("Using selector %v to find service for ingress", selector)
+
+	l, err := labels.Parse(selector)
+	if err != nil {
+		glog.Fatalf("Failed to parse selector %v: %v", selector, err)
+		return nil
+	}
+	serviceListOptions := api.ListOptions{
+		LabelSelector: l,
+	}
+
+	services, err := c.Services(api.NamespaceAll).List(serviceListOptions)
+	if err != nil || len(services.Items) == 0 {
+		glog.Fatalf("Failed to list services that use ingress: %v", err)
+		return nil
+	}
+
+	service := services.Items[0]
+	glog.Infof("For ingress use service: %v", service.GenerateName)
+	return &service
 }
 
 func getDestinationZone(domain string, r53Api *route53.Route53) (*route53.HostedZone, error) {
@@ -216,11 +367,11 @@ func getTLD(domain string) (string, error) {
 	if segments < 3 {
 		return "", fmt.Errorf("Domain %s is invalid - it should be a fully qualified domain name and subdomain (i.e. test.example.com)", domain)
 	}
-	return strings.Join(domainParts[segments-2:], "."), nil
+	return strings.Join(domainParts[segments - 2:], "."), nil
 }
 
 func domainWithTrailingDot(withoutDot string) string {
-	if withoutDot[len(withoutDot)-1:] == "." {
+	if withoutDot[len(withoutDot) - 1:] == "." {
 		return withoutDot
 	}
 	return fmt.Sprint(withoutDot, ".")
@@ -277,17 +428,9 @@ func hostedZoneID(elbAPI *elb.ELB, hostname string) (string, error) {
 	return *descs[0].CanonicalHostedZoneNameID, nil
 }
 
-func updateDNS(r53Api *route53.Route53, hn, hzID, domain, zoneID string) error {
-	at := route53.AliasTarget{
-		DNSName:              &hn,
-		EvaluateTargetHealth: aws.Bool(false),
-		HostedZoneId:         &hzID,
-	}
-	rrs := route53.ResourceRecordSet{
-		AliasTarget: &at,
-		Name:        &domain,
-		Type:        aws.String("A"),
-	}
+func updateDNS(r53Api *route53.Route53, zoneID string, rrs route53.ResourceRecordSet) error {
+	glog.Infof("ZoneID: %v", zoneID)
+
 	change := route53.Change{
 		Action:            aws.String("UPSERT"),
 		ResourceRecordSet: &rrs,
@@ -300,8 +443,8 @@ func updateDNS(r53Api *route53.Route53, hn, hzID, domain, zoneID string) error {
 		ChangeBatch:  &batch,
 		HostedZoneId: &zoneID,
 	}
+
 	if dryRun {
-		glog.Infof("DRY RUN: We normally would have updated %s to point to %s (%s)", zoneID, hzID, hn)
 		return nil
 	}
 
@@ -310,4 +453,31 @@ func updateDNS(r53Api *route53.Route53, hn, hzID, domain, zoneID string) error {
 		return fmt.Errorf("Failed to update record set: %v", err)
 	}
 	return nil
+}
+
+func makeATypeRecordSet(hn, hzID, domain string, ttl int64) route53.ResourceRecordSet {
+	at := route53.AliasTarget{
+		DNSName:              &hn,
+		EvaluateTargetHealth: aws.Bool(false),
+		HostedZoneId:         &hzID,
+	}
+	return route53.ResourceRecordSet{
+		AliasTarget: &at,
+		Name:        &domain,
+		Type:        aws.String("A"),
+		TTL:   	     aws.Int64(ttl),
+	}
+}
+
+func makeCNAMETypeRecordSet(hn, hzID, domain string, ttl int64) route53.ResourceRecordSet {
+	return route53.ResourceRecordSet{
+		ResourceRecords: []*route53.ResourceRecord{
+			&route53.ResourceRecord{
+				Value: &hn,
+			},
+		},
+		Name:  &domain,
+		Type:  aws.String("CNAME"),
+		TTL:   aws.Int64(ttl),
+	}
 }
