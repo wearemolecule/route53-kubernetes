@@ -142,6 +142,12 @@ func main() {
 				continue
 			}
 
+			annotationParent, ok := s.ObjectMeta.Annotations["domainNameParent"]
+			if !ok {
+				glog.Infof("Parent Domain name not set for %s", s.Name)
+				continue
+			}
+
 			domains := strings.Split(annotation, ",")
 			for j := range domains {
 				domain := domains[j]
@@ -171,6 +177,16 @@ func main() {
 					continue
 				}
 				glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
+
+				if annotationParent != "" {
+					glog.Infof("Creating Parent DNS for %s service: %s -> %s", s.Name, annotationParent, domain)
+					if err = updateDNS(r53Api, domain, zoneID, annotationParent, zoneID); err != nil {
+						glog.Warning(err)
+						awsCallFailed = true
+						continue
+					}
+				}
+				glog.Infof("Created parent dns record set: domain=%s, zoneID=%s", annotationParent, zoneID)
 			}
 		}
 		time.Sleep(30 * time.Second)
