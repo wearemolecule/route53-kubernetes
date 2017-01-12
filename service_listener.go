@@ -76,7 +76,7 @@ func main() {
 		// tlsTransport := transport.New(transport.Config{TLS: tls})
 		tlsTransport, err := transport.New(&transport.Config{TLS: tls})
 		if err != nil {
-			glog.Fatalf("Couldn't set up tls transport: %s", err)
+			glog.Fatalf("Couldn't set up TLS transport: %s", err)
 		}
 
 		config = &restclient.Config{
@@ -87,7 +87,7 @@ func main() {
 
 	c, err := client.New(config)
 	if err != nil {
-		glog.Fatalf("Failed to make client: %v", err)
+		glog.Fatalf("Failed to create new client: %v", err)
 	}
 	glog.Infof("Connected to kubernetes @ %s", config.Host)
 
@@ -113,7 +113,7 @@ func main() {
 	r53Api := route53.New(sess)
 	elbAPI := elb.New(sess)
 	if r53Api == nil || elbAPI == nil {
-		glog.Fatal("Failed to make AWS connection")
+		glog.Fatal("Failed to establish AWS connection")
 	}
 
 	selector := "dns=route53"
@@ -125,7 +125,7 @@ func main() {
 		LabelSelector: l,
 	}
 
-	glog.Infof("Starting Service Polling every 30s")
+	glog.Infof("Starting Service; polling interval=30s")
 	for {
 
 		for domain, s := range getDomainServiceMap(c, listOptions) {
@@ -135,7 +135,7 @@ func main() {
 				continue
 			}
 
-			glog.Infof("Creating DNS for %s service: %s -> %s", s.service.Name, hn, domain)
+			glog.Infof("Creating DNS record for %s service: %s -> %s", s.service.Name, domain, hn)
 			elbZoneID, err := hostedZoneID(elbAPI, hn)
 			if err != nil {
 				glog.Warningf("Couldn't get zone ID: %s", err)
@@ -166,7 +166,7 @@ func main() {
 				glog.Infof("DRY RUN: We normally would have updated %s to point %s to %s (%s)", zoneID, domain, hn, elbZoneID)
 			}
 
-			glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
+			glog.Infof("Created DNS record set: domain=%s, zoneID=%s", domain, zoneID)
 		}
 		time.Sleep(30 * time.Second)
 	}
@@ -226,21 +226,21 @@ func getIngressBasedDomainServiceMap(result map[string]rule, c *client.Client, l
 
 	ingresses, err := c.Ingress(api.NamespaceAll).List(listOptions)
 	if err != nil {
-		glog.Fatalf("Failed to list ingress: %v", err)
+		glog.Infof("Failed to list ingress: %v", err)
 		return result
 	}
 
 	glog.Infof("Found %v DNS ingress in all namespaces", len(ingresses.Items))
 
 	for _, ingress := range ingresses.Items {
-		dnsRecordType, ok := service.ObjectMeta.Annotations["dnsRecordType"]
+		dnsRecordType, ok := ingress.ObjectMeta.Annotations["dnsRecordType"]
 		if !ok || !isDNSRecordTypeValid(dnsRecordType)  {
 			dnsRecordType = defaultDNSRecordType()
 		}
 
 		ttl := defaultDNSRecordTTL()
 
-		ttlString, ok := service.ObjectMeta.Annotations["dnsRecordTTL"]
+		ttlString, ok := ingress.ObjectMeta.Annotations["dnsRecordTTL"]
 		if ok && parseTTL(ttlString) != 0  {
 			ttl = parseTTL(ttlString)
 		}
@@ -308,8 +308,13 @@ func getIngressService(c *client.Client)*api.Service {
 	}
 
 	services, err := c.Services(api.NamespaceAll).List(serviceListOptions)
-	if err != nil || len(services.Items) == 0 {
-		glog.Fatalf("Failed to list services that use ingress: %v", err)
+	if err != nil {
+		glog.Infof("Something went wrong: %v", err)
+		return nil
+	}
+
+	if len(services.Items) == 0 {
+		glog.Infof("Ingress controller not installed or ingress service selector %v is not valid. SKIP", l)
 		return nil
 	}
 
@@ -465,7 +470,6 @@ func makeATypeRecordSet(hn, hzID, domain string, ttl int64) route53.ResourceReco
 		AliasTarget: &at,
 		Name:        &domain,
 		Type:        aws.String("A"),
-		TTL:   	     aws.Int64(ttl),
 	}
 }
 
