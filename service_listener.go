@@ -28,7 +28,9 @@ import (
 var dryRun bool
 
 const (
+	// A - dns record type
 	A  = "A"
+	// CNAME - dns record type
 	CNAME = "CNAME"
 )
 
