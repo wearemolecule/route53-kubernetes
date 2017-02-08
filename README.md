@@ -16,11 +16,10 @@ Create the ReplicationController via `kubectl create -f <name_of_route53-kuberne
 Note: We don't currently sign our docker images. So, please use our images at your own risk.
 
 ```yaml
-apiVersion: v1
-kind: ReplicationController
+kind: Deployment
+apiVersion: extensions/v1beta1
 metadata:
   name: route53-kubernetes
-  namespace: kube-system
   labels:
     app: route53-kubernetes
 spec:
