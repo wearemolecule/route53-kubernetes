@@ -25,8 +25,6 @@ metadata:
     app: route53-kubernetes
 spec:
   replicas: 1
-  selector:
-    app: route53-kubernetes
   template:
     metadata:
       labels:
