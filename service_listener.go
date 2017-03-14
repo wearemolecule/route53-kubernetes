@@ -164,16 +164,39 @@ func main() {
 				zoneID := *zone.Id
 				zoneParts := strings.Split(zoneID, "/")
 				zoneID = zoneParts[len(zoneParts)-1]
-
-				if err = updateDNS(r53Api, hn, elbZoneID, strings.TrimLeft(domain, "."), zoneID); err != nil {
-					glog.Warning(err)
-					awsCallFailed = true
-					continue
+				if !isRecordSetCreated(domain, zoneID, hn, r53Api) {
+					if err = updateDNS(r53Api, hn, elbZoneID, strings.TrimLeft(domain, "."), zoneID); err != nil {
+						glog.Warning(err)
+						awsCallFailed = true
+						continue
+					}
+					glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
+				} else {
+					glog.Infof("RecordSet already exists: domain=%s, zoneID=%s", domain, zoneID)
 				}
-				glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
 			}
 		}
 		time.Sleep(30 * time.Second)
+	}
+}
+
+func isRecordSetCreated(domain string, zoneID string, hn string, r53Api *route53.Route53) bool {
+	domain = domainWithTrailingDot(domain)
+	listRecordsetInput := &route53.ListResourceRecordSetsInput{
+	  HostedZoneId: aws.String(zoneID),
+	  StartRecordName: aws.String(domain),
+	  MaxItems: aws.String("1")
+	}
+
+	var respList, err = r53Api.ListResourceRecordSets(listRecordsetInput)
+	if err != nil {
+		return false
+	}
+
+	if (hn == *respList.ResourceRecordSets[0].AliasTarget.DNSName) {
+		return true
+	} else {
+		return false
 	}
 }
 
