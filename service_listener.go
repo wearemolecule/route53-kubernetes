@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"time"
+	"strconv"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -25,11 +26,24 @@ import (
 
 // Don't actually commit the changes to route53 records, just print out what we would have done.
 var dryRun bool
+// Sleep time in secs before checking
+var sleepTime int
 
 func init() {
 	dryRunStr := os.Getenv("DRY_RUN")
 	if dryRunStr != "" {
 		dryRun = true
+	}
+	
+	sleepTimeString := os.Getenv("SLEEP_TIME")
+	if (sleepTimeString != "") {
+		i64, err := strconv.ParseInt(sleepTimeString, 10, 32)
+		if (err != nil) {
+			fmt.Println("Error while trying to parse SLEEP_TIME env var")
+		}
+		sleepTime := int32(i64)
+	} else {
+		sleepTime = 30
 	}
 }
 
@@ -173,7 +187,7 @@ func main() {
 				glog.Infof("Created dns record set: domain=%s, zoneID=%s", domain, zoneID)
 			}
 		}
-		time.Sleep(30 * time.Second)
+		time.Sleep(sleepTime * time.Second)
 	}
 }
 
