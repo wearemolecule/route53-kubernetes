@@ -40,6 +40,7 @@ func init() {
 		i64, err := strconv.ParseInt(sleepTimeString, 10, 32)
 		if (err != nil) {
 			fmt.Println("Error while trying to parse SLEEP_TIME env var")
+			os.Exit(1)
 		}
 		sleepTime := int32(i64)
 	} else {
