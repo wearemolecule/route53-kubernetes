@@ -27,14 +27,14 @@ import (
 // Don't actually commit the changes to route53 records, just print out what we would have done.
 var dryRun bool
 // Sleep time in secs before checking
-var sleepTime int
+var sleepTime time.Duration
 
 func init() {
 	dryRunStr := os.Getenv("DRY_RUN")
 	if dryRunStr != "" {
 		dryRun = true
 	}
-	
+
 	sleepTimeString := os.Getenv("SLEEP_TIME")
 	if (sleepTimeString != "") {
 		i64, err := strconv.ParseInt(sleepTimeString, 10, 32)
@@ -42,7 +42,7 @@ func init() {
 			fmt.Println("Error while trying to parse SLEEP_TIME env var")
 			os.Exit(1)
 		}
-		sleepTime := int32(i64)
+		sleepTime = time.Duration(int32(i64))
 	} else {
 		sleepTime = 30
 	}
@@ -222,7 +222,7 @@ func findMostSpecificZoneForDomain(domain string, zones []*route53.HostedZone) (
 		zone := zones[i]
 		zoneName := *zone.Name
 
-		if strings.HasSuffix(domain, "." + zoneName) && curLen < len(zoneName) {
+		if (domain == zoneName || strings.HasSuffix(domain, "." + zoneName)) && curLen < len(zoneName) {
 			curLen = len(zoneName)
 			mostSpecific = zone
 		}
