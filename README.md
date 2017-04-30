@@ -96,6 +96,41 @@ An "A" record for `test.mydomain.com` will be created as an alias to the ELB tha
 configured by kubernetes. This assumes that a hosted zone exists in Route53 for mydomain.com.
 Any record that previously existed for that dns record will be updated.
 
+### Optional Service Configuration
+
+Given the following Kubernetes service definition:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+  labels:
+    app: my-app
+    role: web
+    dns: route53
+  annotations:
+    domainName: "us-east-1-clustera-test.mydomain.com"
+    domainNameParent: "test.mydomain.com"
+spec:
+  selector:
+    app: my-app
+    role: web
+  ports:
+  - name: web
+    port: 80
+    protocol: TCP
+    targetPort: web
+  - name: web-ssl
+    port: 443
+    protocol: TCP
+    targetPort: web-ssl
+  type: LoadBalancer
+```
+
+An "A" record for `test.mydomain.com` will be created as an alias to `us-east-1-clustera-test.mydomain.com` and an "A" record for `us-east-1-clustera-test.mydomain.com` will be created as an alias to the ELB that is configured by kubernetes. This assumes that a hosted zone exists in Route53 for mydomain.com.
+
+Any record that previously existed for that dns record will be updated.
 
 ### Alternative setup
 
