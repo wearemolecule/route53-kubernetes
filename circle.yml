@@ -1,0 +1,24 @@
+version: 2
+executorType: docker
+containerInfo:
+jobs:
+  build:
+    working_directory: /go/src/github.com/adfin/route53-kubernetes
+    docker:
+      - image: circleci/golang:1.8
+    environment:
+      - GLIDE_VERSION: v0.12.3
+    steps:
+      - checkout
+      - setup_remote_docker:
+          reusable: true
+      - run: mkdir -p ~/download
+      - run: curl -L -o ~/download/glide-${GLIDE_VERSION}-linux-amd64.tar.gz https://github.com/Masterminds/glide/releases/download/${GLIDE_VERSION}/glide-${GLIDE_VERSION}-linux-amd64.tar.gz
+      - run: sudo tar -C /usr/local/bin -xzf ~/download/glide-${GLIDE_VERSION}-linux-amd64.tar.gz linux-amd64/glide --strip=1 
+      - run: glide install
+      - run: go build
+      - run: docker build -t quay.io/adfin/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH} .
+      - type: deploy
+        command: |
+          docker login -e robot@adfin.com -u ${QUAYIO_USER} -p ${QUAYIO_PASSWORD} quay.io
+          docker push quay.io/adfin/${CIRCLE_PROJECT_REPONAME}:${CIRCLE_BRANCH}
