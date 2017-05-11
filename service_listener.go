@@ -157,6 +157,9 @@ func main() {
 				continue
 			}
 
+			evaluateTargetHealth, err := strconv.ParseBool(s.ObjectMeta.Annotations["evaluateTargetHealth"])
+			glog.Infof("Evaluate Target Health for %s: %t", annotation, evaluateTargetHealth)
+
 			domains := strings.Split(annotation, ",")
 			for j := range domains {
 				domain := domains[j]
@@ -180,7 +183,7 @@ func main() {
 				zoneParts := strings.Split(zoneID, "/")
 				zoneID = zoneParts[len(zoneParts)-1]
 
-				if err = updateDNS(r53Api, hn, elbZoneID, strings.TrimLeft(domain, "."), zoneID); err != nil {
+				if err = updateDNS(r53Api, hn, elbZoneID, strings.TrimLeft(domain, "."), zoneID, evaluateTargetHealth); err != nil {
 					glog.Warning(err)
 					awsCallFailed = true
 					continue
@@ -302,10 +305,10 @@ func hostedZoneID(elbAPI *elb.ELB, hostname string) (string, error) {
 	return *descs[0].CanonicalHostedZoneNameID, nil
 }
 
-func updateDNS(r53Api *route53.Route53, hn, hzID, domain, zoneID string) error {
+func updateDNS(r53Api *route53.Route53, hn, hzID, domain, zoneID string, evaluateTargetHealth bool) error {
 	at := route53.AliasTarget{
 		DNSName:              &hn,
-		EvaluateTargetHealth: aws.Bool(false),
+		EvaluateTargetHealth: aws.Bool(evaluateTargetHealth),
 		HostedZoneId:         &hzID,
 	}
 	rrs := route53.ResourceRecordSet{
