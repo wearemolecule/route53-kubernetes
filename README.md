@@ -96,6 +96,12 @@ An "A" record for `test.mydomain.com` will be created as an alias to the ELB tha
 configured by kubernetes. This assumes that a hosted zone exists in Route53 for mydomain.com.
 Any record that previously existed for that dns record will be updated.
 
+#### Evaluating target health
+
+Target Health Evaluation by Route 53 can be enabled by adding an `evaluateTargetHealth=true` annotation. Please note that
+if you have specified multiple domains with the `domainName` annotation, target health evaluation will be enabled for
+each record created.
+
 
 ### Alternative setup
 
