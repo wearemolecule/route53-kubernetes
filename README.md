@@ -1,11 +1,16 @@
-# Kubernetes => Route53 Mapping Service
+# DEPRECATED
+
+This repo has been officially deprecated in favor of the https://github.com/kubernetes-incubator/external-dns addon. That addon offers a lot more features, better performance, and a compatibility mode for current users of route53-kubernetes. See compatibility mode docs [here](https://github.com/kubernetes-incubator/external-dns/blob/55d709c38ce87ec05d8ab6cd568ca65bc7557fcf/docs/faq.md#how-do-i-specify-dns-name-for-my-kubernetes-objects).
+
+
+## Kubernetes => Route53 Mapping Service
 
 This is a Kubernetes service that polls services (in all namespaces) that are configured
 with the label `dns=route53` and adds the appropriate alias to the domain specified by
 the annotation `domainName=sub.mydomain.io`. Multiple domains and top level domains are also supported:
 `domainName=.mydomain.io,sub1.mydomain.io,sub2.mydomain.io`
 
-# Usage
+## Usage
 
 ### route53-kubernetes ReplicationController
 
