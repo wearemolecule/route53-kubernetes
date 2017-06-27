@@ -252,6 +252,9 @@ func domainWithTrailingDot(withoutDot string) string {
 }
 
 func serviceHostname(service *api.Service) (string, error) {
+        if ! len(service.ObjectMeta.Annotations["ELBHostname"]) == 0 {
+           return service.ObjectMeta.Annotations["ELBHostname"], nil
+        }
 	ingress := service.Status.LoadBalancer.Ingress
 	if len(ingress) < 1 {
 		return "", errors.New("No ingress defined for ELB")
